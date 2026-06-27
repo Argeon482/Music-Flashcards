@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net (First Match Rule Block)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions for common validation constraints
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper for Song entity schema validation
+    function isValidSong(data) {
+      return data.title is string && data.title.size() <= 150
+        && data.artist is string && data.artist.size() <= 150
+        && data.youtubeId is string && data.youtubeId.size() <= 30
+        && data.phrases is list && data.phrases.size() <= 300
+        && data.vocab is list && data.vocab.size() <= 150
+        && data.updatedAt is string && data.updatedAt.size() <= 40
+        && data.createdBy is string && (data.createdBy == 'Andrew' || data.createdBy == 'Friend');
+    }
+
+    // Helper for StudyNote entity schema validation
+    function isValidStudyNote(data) {
+      return (data.phraseId is int || data.phraseId is float)
+        && data.partnerA is string && data.partnerA.size() <= 1000
+        && data.partnerB is string && data.partnerB.size() <= 1000
+        && data.updatedAt is string && data.updatedAt.size() <= 40;
+    }
+
+    // Shared Songs collection rules
+    match /songs/{songId} {
+      allow read: if true;
+      
+      allow create: if isValidId(songId) 
+        && incoming().keys().hasAll(['title', 'artist', 'youtubeId', 'phrases', 'vocab', 'updatedAt', 'createdBy'])
+        && incoming().keys().size() == 7
+        && isValidSong(incoming());
+
+      allow update: if isValidId(songId)
+        && isValidSong(incoming())
+        && incoming().createdBy == existing().createdBy; // Immutable field check
+
+      allow delete: if true;
+    }
+
+    // Shared Study Notes collection rules
+    match /study_notes/{noteId} {
+      allow read: if true;
+
+      allow create: if isValidId(noteId)
+        && incoming().keys().hasAll(['phraseId', 'partnerA', 'partnerB', 'updatedAt'])
+        && incoming().keys().size() == 4
+        && isValidStudyNote(incoming());
+
+      allow update: if isValidId(noteId)
+        && isValidStudyNote(incoming())
+        && incoming().phraseId == existing().phraseId; // Immutable field check
+
+      allow delete: if true;
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Song": {
+      "title": "Song",
+      "description": "Bilingual song lyric and vocabulary study companion data",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The song title"
+        },
+        "artist": {
+          "type": "string",
+          "description": "The song artist name"
+        },
+        "youtubeId": {
+          "type": "string",
+          "description": "11-character YouTube video ID"
+        },
+        "phrases": {
+          "type": "array",
+          "description": "List of song phrase cards for flashcards/quizzes"
+        },
+        "vocab": {
+          "type": "array",
+          "description": "Key vocabulary words and expressions extracted from the song"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Indicates if created by Andrew (spanish-learner) or Friend (english-learner)"
+        }
+      },
+      "required": ["title", "artist", "youtubeId", "phrases", "vocab", "updatedAt"]
+    },
+    "StudyNote": {
+      "title": "StudyNote",
+      "description": "Shared buddy notes synchronized for a specific phrase ID",
+      "type": "object",
+      "properties": {
+        "phraseId": {
+          "type": "number",
+          "description": "The unique ID of the phrase this study note attaches to"
+        },
+        "partnerA": {
+          "type": "string",
+          "description": "Andrew's (Spanish learner) study notes for this phrase"
+        },
+        "partnerB": {
+          "type": "string",
+          "description": "Friend's (English learner) study notes for this phrase"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["phraseId", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/songs/{songId}": {
+      "schema": "Song",
+      "description": "Shared songs database collection"
+    },
+    "/study_notes/{noteId}": {
+      "schema": "StudyNote",
+      "description": "Real-time synced phrase study notes for cooperative learning"
+    }
+  }
+}

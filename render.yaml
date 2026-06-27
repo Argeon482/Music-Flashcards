@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: confieso-study-companion
+    env: static
+    buildCommand: npm run build
+    publishPath: dist

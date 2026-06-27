@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Confieso Study Companion",
+  "description": "Interactive Spanish lyric companion and phrase trainer for the song Confieso by Humbe.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
