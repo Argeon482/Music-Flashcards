@@ -11,6 +11,8 @@ export interface Phrase {
   category: string;
   timestamp: number;
   timestampStr: string;
+  timestampEnd?: number;
+  timestampEndStr?: string;
   breakdown: PhraseBreakdown[];
 }
 

@@ -5,7 +5,8 @@ import {
   HelpCircle, Keyboard, ArrowLeft, ArrowRight, Music, 
   AlertCircle, Headphones, Shuffle, Upload, Download, Film,
   Info, Sparkle, ExternalLink, CheckCircle2, Copy, Plus,
-  Trash2, FolderHeart, Languages, Settings, Users, Cloud, CloudOff, CloudLightning
+  Trash2, FolderHeart, Languages, Settings, Users, Cloud, CloudOff, CloudLightning,
+  Layers
 } from 'lucide-react';
 import { SONG_DATA } from './data';
 import { Phrase, PhraseBreakdown, VocabTerm, SongData } from './types';
@@ -16,12 +17,12 @@ import { db, collection, onSnapshot, setDoc, doc, deleteDoc, handleFirestoreErro
 const PROMPT_TEMPLATES = {
   flash: `Retrieve the FULL, complete lyrics, English translations, selective breakdowns, and timestamps for a song.
 
-CRITICAL REQUIREMENT FOR GEMINI FLASH/LITE (TOKEN OPTIMIZATION):
-To prevent hitting maximum output token limits and being cut off or truncated, you MUST follow these guidelines:
-1. Do NOT skip or summarize any lyrics. You must include EVERY single sentence/phrase from the Intro to the Outro.
-2. To save precious tokens so the complete song fits in a single turn, limit the 'breakdown' array within each phrase to ONLY the 1 or 2 most important/challenging words of that phrase, rather than breaking down every word.
-3. Extract a comprehensive vocabulary list of at least 12-15 core words/idioms from the song and list them in the "vocab" array.
-4. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
+CRITICAL REQUIREMENTS FOR SYSTEMATIC LEARNING:
+1. Do NOT skip or summarize any lyrics. Include EVERY single phrase/sentence from the Intro to the Outro.
+2. For each phrase, provide BOTH the start and end timestamps (use exact transcript times if available, or estimate them; the end time should be when that phrase finishes, usually 2-5 seconds after the start time or right before the next phrase starts).
+3. In the "breakdown" array of EACH phrase, you MUST provide a complete, exhaustive translation of every key word, verb, and phrase block in that specific phrase, rather than just 1 or 2 words. Break down virtually every word in the phrase so the learner has absolute clarity on how the phrase is built.
+4. In the "vocab" array, provide an exhaustive, complete vocabulary list capturing all unique verbs, nouns, slang, and idiomatic expressions across the entire song. Every key word of the lyrics should be represented so that by the end of training, the learner has fully mastered the vocabulary of the entire song.
+5. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
 
 Here is the exact schema structure required:
 {
@@ -37,8 +38,10 @@ Here is the exact schema structure required:
       "category": "Song section (e.g., Chorus, Verse 1, Intro)",
       "timestamp": 12,
       "timestampStr": "0:12",
+      "timestampEnd": 15.5,
+      "timestampEndStr": "0:15.5",
       "breakdown": [
-        { "word": "Only 1 or 2 key Spanish words", "meaning": "English translation" }
+        { "word": "Spanish word/chunk", "meaning": "English translation" }
       ]
     }
   ],
@@ -51,11 +54,12 @@ Please provide the complete structured data for this song: "[INSERT SONG NAME AN
 
   detailed: `Retrieve the FULL, complete lyrics, English translations, highly detailed word-by-word breakdowns, and timestamps for a song.
 
-CRITICAL REQUIREMENTS (FOR HIGH-CAPACITY PRO MODELS):
+CRITICAL REQUIREMENTS:
 1. You MUST include every single lyric line from start to finish. Do NOT summarize or omit anything.
-2. In the "breakdown" array of each phrase, provide a comprehensive word-by-word or chunk-by-chunk translation of virtually all words in that phrase.
-3. In the "vocab" array, include at least 15-20 key vocabulary words, slang, verbs, or grammar points found in the song with definitions and contextual examples.
-4. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
+2. For each phrase, provide BOTH the start and end timestamps (use exact transcript times if available, or estimate them; the end time should be when that phrase finishes, usually 2-5 seconds after the start time or right before the next phrase starts).
+3. In the "breakdown" array of EACH phrase, provide a comprehensive, complete word-by-word or chunk-by-chunk translation of virtually all words in that specific phrase so no word is left unexplained.
+4. In the "vocab" array, include an exhaustive list of all vocabulary words, verbs (with base forms), slang, and grammar points found in the song, complete with clear definitions and contextual examples from the song. By training on this deck, the learner should master every word in the entire song.
+5. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
 
 Here is the exact schema structure required:
 {
@@ -71,6 +75,8 @@ Here is the exact schema structure required:
       "category": "Song section (e.g., Chorus, Verse 1, Intro)",
       "timestamp": 12,
       "timestampStr": "0:12",
+      "timestampEnd": 15.5,
+      "timestampEndStr": "0:15.5",
       "breakdown": [
         { "word": "Spanish word", "meaning": "English translation" }
       ]
@@ -87,9 +93,11 @@ Please provide the complete structured data for this song: "[INSERT SONG NAME AN
 
 CRITICAL REQUIREMENTS FOR EXTRA LONG SONGS:
 1. We will generate this long song in two separate halves so it is fully comprehensive and does not truncate.
-2. Provide ONLY the first half of the song (e.g., Intro, Verse 1, Chorus, Verse 2). 
-3. Include a comprehensive "vocab" array of 8-10 terms found in this first half.
-4. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
+2. Provide ONLY the first half of the song (e.g., Intro, Verse 1, Chorus, Verse 2) without skipping any lines.
+3. For each phrase, provide BOTH the start and end timestamps (use exact transcript times if available, or estimate them; the end time should be when that phrase finishes, usually 2-5 seconds after the start time or right before the next phrase starts).
+4. In the "breakdown" array of each phrase, provide a complete, exhaustive translation of virtually all words and key chunks in that phrase.
+5. In the "vocab" array, include a highly detailed list of all unique vocabulary words, verbs, and expressions found in this half of the song so that the learner gets complete coverage.
+6. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
 
 Here is the exact schema structure required:
 {
@@ -105,6 +113,8 @@ Here is the exact schema structure required:
       "category": "Song section",
       "timestamp": 12,
       "timestampStr": "0:12",
+      "timestampEnd": 15.5,
+      "timestampEndStr": "0:15.5",
       "breakdown": [
         { "word": "Spanish word", "meaning": "English translation" }
       ]
@@ -485,6 +495,17 @@ export default function App() {
 
   const t = (key: string) => UI_TRANSLATIONS[uiLang]?.[key] || UI_TRANSLATIONS['en']?.[key] || key;
 
+  const formatTimeSeconds = (totalSecs: number) => {
+    const minutes = Math.floor(totalSecs / 60);
+    const seconds = Math.floor(totalSecs % 60);
+    const msFraction = Math.round((totalSecs % 1) * 10);
+    let str = `${minutes}:${String(seconds).padStart(2, '0')}`;
+    if (msFraction > 0) {
+      str += `.${msFraction}`;
+    }
+    return str;
+  };
+
   const [activeTab, setActiveTab] = useState<string>('flashcards'); // flashcards, quiz, dictation, vocab, lyrics
   const [currentDeck, setCurrentDeck] = useState<string>('All'); // All, Support, Struggle, Hope, Vulnerability, Starred
   const [starredIds, setStarredIds] = useState<number[]>([]);
@@ -819,6 +840,201 @@ export default function App() {
   const [promptTargetLangB, setPromptTargetLangB] = useState<string>('English');
   const [promptNativeLangB, setPromptNativeLangB] = useState<string>('Spanish');
 
+  // Helper to parse transcripts from HTML, text or SRT formats
+  const parseTranscriptText = (text: string): { timestamp: number, timestampStr: string, text: string }[] => {
+    // Regex to find timestamps like 12:34, 1:23:45, [1:23], (1:23)
+    const timestampRegex = /(?:\[|\()?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\]|\))?/g;
+    
+    const matches: { index: number, text: string, timestamp: number, timestampStr: string }[] = [];
+    let match;
+    
+    while ((match = timestampRegex.exec(text)) !== null) {
+      const hours = match[1] ? parseInt(match[1], 10) : 0;
+      const minutes = parseInt(match[2], 10);
+      const seconds = parseInt(match[3], 10);
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      const timestampStr = match[0].replace(/[\[\]\(\)]/g, '').trim();
+      
+      matches.push({
+        index: match.index,
+        text: match[0],
+        timestamp: totalSeconds,
+        timestampStr: timestampStr
+      });
+    }
+    
+    const results: { timestamp: number, timestampStr: string, text: string }[] = [];
+    
+    for (let i = 0; i < matches.length; i++) {
+      const current = matches[i];
+      const nextIndex = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      
+      // Extract text between current timestamp and next timestamp
+      let segmentText = text.substring(current.index + current.text.length, nextIndex).trim();
+      
+      // Clean up segment text
+      segmentText = segmentText
+        .replace(/\r?\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+        
+      if (segmentText) {
+        results.push({
+          timestamp: current.timestamp,
+          timestampStr: current.timestampStr,
+          text: segmentText
+        });
+      }
+    }
+    
+    return results;
+  };
+
+  const cleanTranscriptHTMLAndGetText = (htmlString: string): string => {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlString, 'text/html');
+      
+      const unwantedTags = ['script', 'style', 'head', 'svg', 'noscript', 'iframe'];
+      unwantedTags.forEach(tag => {
+        const elements = doc.querySelectorAll(tag);
+        elements.forEach(el => el.remove());
+      });
+      
+      return doc.body?.innerText || doc.body?.textContent || htmlString;
+    } catch (e) {
+      console.error("DOMParser failed, falling back to raw text", e);
+      return htmlString;
+    }
+  };
+
+  const handleTranscriptFileUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        let plainText = content;
+        
+        const lowercaseName = file.name.toLowerCase();
+        const looksLikeHtml = lowercaseName.endsWith('.html') || 
+                            lowercaseName.endsWith('.htm') || 
+                            lowercaseName.endsWith('.bin') ||
+                            content.trim().startsWith('<') || 
+                            content.includes('<!DOCTYPE') || 
+                            content.includes('<html');
+        if (looksLikeHtml) {
+          plainText = cleanTranscriptHTMLAndGetText(content);
+        }
+        
+        const segments = parseTranscriptText(plainText);
+        if (segments.length === 0) {
+          // Fall back to split-by-line parsing if no timestamps are matched
+          const lines = plainText
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && !line.startsWith('<'));
+            
+          if (lines.length > 0) {
+            const fallbackSegments = lines.map((line, idx) => {
+              const estimateSeconds = idx * 5;
+              const mins = Math.floor(estimateSeconds / 60);
+              const secs = estimateSeconds % 60;
+              const timestampStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+              return {
+                timestamp: estimateSeconds,
+                timestampStr,
+                text: line
+              };
+            });
+            
+            const formatted = fallbackSegments.map(seg => `${seg.timestampStr} ${seg.text}`).join('\n');
+            setPromptTranscript(formatted);
+            setSelectedPromptType('transcript');
+            
+            // Also generate draft song json
+            const draftPhrases = fallbackSegments.map((seg, idx) => ({
+              id: idx + 1,
+              spanish: seg.text,
+              english: `[English translation for: ${seg.text}]`,
+              literal: `[Word-for-word translation for: ${seg.text}]`,
+              category: "Section 1",
+              timestamp: seg.timestamp,
+              timestampStr: seg.timestampStr,
+              breakdown: [{ word: "word", meaning: "meaning" }]
+            }));
+            
+            const draftSong = {
+              title: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "),
+              artist: "Speaker",
+              youtubeId: "YOUTUBE_ID",
+              phrases: draftPhrases,
+              vocab: [{ word: "word", definition: "meaning", example: "example" }]
+            };
+            
+            setSongInputJson(JSON.stringify(draftSong, null, 2));
+            setValidationError(null);
+            setSuccessMessage(`Successfully parsed ${fallbackSegments.length} text lines from ${file.name}! Switch to the "Transcript-Guided (New)" prompt tab to copy the translation prompt.`);
+            setValidationSuccess(true);
+            setTimeout(() => setValidationSuccess(false), 5000);
+            return;
+          }
+          
+          setValidationError("Could not extract any transcript segments or lines from the file.");
+          return;
+        }
+        
+        const formatted = segments.map(seg => `${seg.timestampStr} ${seg.text}`).join('\n');
+        setPromptTranscript(formatted);
+        setSelectedPromptType('transcript');
+        
+        // Populate the metadata title based on the filename
+        const cleanName = file.name
+          .replace(/\.[^/.]+$/, "") // strip extension
+          .replace(/[-_]/g, " ") // replace dashes/underscores with spaces
+          .replace(/\b\w/g, c => c.toUpperCase()); // title case
+          
+        setPromptSongName(cleanName + " by Speaker");
+        
+        // Also pre-populate the JSON text area with a working draft containing all correct timestamps!
+        const draftPhrases = segments.map((seg, index) => ({
+          id: index + 1,
+          spanish: seg.text,
+          english: `[English translation for: ${seg.text}]`,
+          literal: `[Word-for-word translation for: ${seg.text}]`,
+          category: "Section",
+          timestamp: seg.timestamp,
+          timestampStr: seg.timestampStr,
+          breakdown: [
+            { word: "word", meaning: "meaning" }
+          ]
+        }));
+        
+        const draftSong = {
+          title: cleanName,
+          artist: "Speaker",
+          youtubeId: "YOUTUBE_ID",
+          phrases: draftPhrases,
+          vocab: [
+            {
+              word: "word",
+              definition: "meaning",
+              example: "example sentence"
+            }
+          ]
+        };
+        
+        setSongInputJson(JSON.stringify(draftSong, null, 2));
+        setValidationError(null);
+        setSuccessMessage(`Successfully parsed ${segments.length} segments with timestamps from ${file.name}! Switch to the "Transcript-Guided (New)" prompt tab to copy the translation prompt.`);
+        setValidationSuccess(true);
+        setTimeout(() => setValidationSuccess(false), 5000);
+      } catch (err: any) {
+        setValidationError(`Failed to parse transcript file: ${err.message}`);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
   // Incremental chunk options
   const [resumeChunkSize, setResumeChunkSize] = useState<number>(10);
   const [customResumeStart, setCustomResumeStart] = useState<string>('');
@@ -850,49 +1066,54 @@ export default function App() {
     }
 
     if (selectedPromptType === 'transcript') {
-      return `You will be provided with a raw YouTube transcript of a song (with timestamps).
+      return `You will be provided with a raw YouTube transcript of a video (with timestamps).
 Your task is to convert this transcript into the complete bilingual study companion JSON dataset.
 
-CRITICAL INSTRUCTIONS:
+CRITICAL INSTRUCTIONS FOR SYSTEMATIC LEARNING:
 1. Use the provided transcript's timestamps, ${promptTargetLangA} spelling, and phrase order EXACTLY.
-2. For EVERY line/phrase in the transcript, translate it and create a phrase card. Do NOT skip, summarize, or group lines unless necessary for natural translation.
-3. For each phrase, provide:
-   - "spanish": The original lyric line (from the transcript, in ${promptTargetLangA}). Note: we keep the JSON key as "spanish" for application compatibility.
+2. For EVERY single line/phrase in the transcript, translate it and create a phrase card. Do NOT skip, summarize, or group lines. We want a complete and total translation of every phrase.
+3. For each phrase, provide BOTH the start and end timestamps. Use exact transcript times if available, or estimate them; the end time should be when that phrase finishes, usually 2-5 seconds after the start time or right before the next phrase starts.
+4. For each phrase, provide:
+   - "spanish": The original line (from the transcript, in ${promptTargetLangA}). Note: we keep the JSON key as "spanish" for application compatibility.
    - "english": A natural, high-quality ${promptNativeLangA} translation. Note: we keep the JSON key as "english" for application compatibility.
    - "literal": A literal word-for-word translation.
-   - "category": The song section (e.g., Verse, Chorus, Intro, Hook).
+   - "category": The video section/category (e.g., Intro, Part 1, Part 2, Topic A).
    - "timestamp": The start time in total seconds (parsed from the transcript timestamp, e.g., 1:24 = 84).
    - "timestampStr": The string timestamp format (e.g. "1:24" or "0:08").
-   - "breakdown": Limit to 1-2 of the most important/challenging words in that phrase with their ${promptNativeLangA} meaning.
-4. Extract a comprehensive vocabulary list of 12-15 core words/idioms from the song and list them in the "vocab" array.
-5. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
+   - "timestampEnd": The end time in total seconds (estimated or exact, e.g., 1:27 = 87).
+   - "timestampEndStr": The string timestamp format for the end of the phrase (e.g., "1:27").
+   - "breakdown": In the "breakdown" array of EACH phrase, you MUST provide a complete, exhaustive translation of every key word, verb, and phrase block in that specific phrase. Break down virtually every word in the phrase so the learner has absolute clarity on how the phrase is built, rather than just 1 or 2 words.
+5. Extract an exhaustive vocabulary list capturing all unique verbs (in base form), nouns, slang, and expressions across the entire video and list them in the "vocab" array, complete with clear definitions and contextual examples so the user can learn the entirety of the video content.
+6. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
 
 Here is the exact schema structure required (do NOT change the keys "spanish" or "english"):
 {
   "title": "${targetSongName.split(' by ')[0] || targetSongName}",
-  "artist": "${targetSongName.split(' by ')[1] || 'Artist'}",
+  "artist": "${targetSongName.split(' by ')[1] || 'Speaker'}",
   "youtubeId": "${targetYoutubeId}",
   "phrases": [
     {
       "id": 1,
-      "spanish": "original lyric in ${promptTargetLangA}",
+      "spanish": "original text line in ${promptTargetLangA}",
       "english": "Natural ${promptNativeLangA} translation",
       "literal": "Literal translation",
-      "category": "Chorus",
+      "category": "Topic Name",
       "timestamp": 12,
       "timestampStr": "0:12",
+      "timestampEnd": 15.5,
+      "timestampEndStr": "0:15.5",
       "breakdown": [
         { "word": "word", "meaning": "translation" }
       ]
     }
   ],
   "vocab": [
-    { "word": "word", "definition": "definition", "example": "sentence from song" }
+    { "word": "word", "definition": "definition", "example": "sentence from transcript" }
   ]
 }
 
 Here is the raw YouTube transcript to process:
-${promptTranscript.trim() || "(Please paste your raw YouTube transcript in the input field above to automatically include it here!)"}`;
+${promptTranscript.trim() || "(Please paste or upload your raw transcript in the input fields above to automatically include it here!)"}`;
     }
 
     if (selectedPromptType === 'resume') {
@@ -903,19 +1124,21 @@ ${promptTranscript.trim() || "(Please paste your raw YouTube transcript in the i
         english: lastPhrase.english,
         timestampStr: lastPhrase.timestampStr,
         timestamp: lastPhrase.timestamp,
+        timestampEndStr: lastPhrase.timestampEndStr,
+        timestampEnd: lastPhrase.timestampEnd,
         category: lastPhrase.category
       } : null;
 
-      return `We are compiling structured bilingual learning companion data for the song "${songData.title}" by "${songData.artist}" (YouTube Video ID: "${targetYoutubeId}").
-Because the song has many lyrics and to avoid token exhaustion or truncation, we are doing this incrementally in multiple rounds.
+      return `We are compiling structured bilingual learning companion data for "${songData.title}" by "${songData.artist}" (Video ID: "${targetYoutubeId}").
+Because the transcript is very long, we are doing this incrementally in multiple rounds.
 
 We have already completed ${songData.phrases.length} phrases. Here is the last translated phrase of our current save state:
-${lastPhraseInfo ? JSON.stringify(lastPhraseInfo, null, 2) : "None yet. This is the start of the song."}
+${lastPhraseInfo ? JSON.stringify(lastPhraseInfo, null, 2) : "None yet. This is the start of the video."}
 
-Please continue translating the song. Specifically, you MUST translate phrases ${startPhraseNum} to ${endPhraseNum} of the song.
-Do NOT repeat any of the previously completed lyrics. Translate starting immediately after the previously translated lyric: "${lastPhrase ? lastPhrase.spanish : "(Start of the song)"}".
+Please continue translating the transcript. Specifically, you MUST translate phrases ${startPhraseNum} to ${endPhraseNum} of the transcript.
+Do NOT repeat any of the previously completed lines. Translate starting immediately after the previously translated line: "${lastPhrase ? lastPhrase.spanish : "(Start of transcript)"}".
 
-Provide timestamps, natural ${promptNativeLangA} translations, literal word-for-word translations, selective breakdowns (limiting breakdowns to only the 1 or 2 most challenging/interesting words of each phrase to save precious tokens), and any key vocabulary words (add to the "vocab" array).
+Provide start and end timestamps (estimate the end timestamp to be when the phrase ends, usually 2-5 seconds after start), natural ${promptNativeLangA} translations, literal word-for-word translations, complete breakdowns (exhaustive word-by-word and chunk-by-chunk breakdowns for virtually all words in each phrase so that no word is left unexplained), and an exhaustive vocabulary list (add to the "vocab" array) capturing all unique verbs, nouns, and slang across these lines.
 
 Format the response EXACTLY as a single raw JSON object matching the schema below. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
 Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}. Keep the JSON keys "spanish" and "english" for front-end compatibility:
@@ -930,6 +1153,8 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
       "category": "Song section (e.g., Verse 2, Chorus, Outro)",
       "timestamp": ${lastPhrase ? lastPhrase.timestamp + 4 : 0},
       "timestampStr": "MM:SS",
+      "timestampEnd": ${lastPhrase ? lastPhrase.timestamp + 7 : 3},
+      "timestampEndStr": "MM:SS",
       "breakdown": [
         { "word": "word", "meaning": "translation" }
       ]
@@ -974,12 +1199,89 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
   }, [selectedPromptType, songData, startPhraseNum, endPhraseNum, promptSongName, promptYoutubeId, promptTranscript, promptTargetLangA, promptNativeLangA, promptTargetLangB, promptNativeLangB]);
 
   // Flashcard states
-  const [cardIndex, setCardIndex] = useState<number>(0);
+  const [cardIndex, setCardIndex] = useState<number>(() => {
+    try {
+      let initialTitle = SONG_DATA.title;
+      const savedSong = localStorage.getItem('confieso_custom_song');
+      if (savedSong) {
+        const parsed = JSON.parse(savedSong);
+        if (parsed && parsed.title) {
+          initialTitle = parsed.title;
+        }
+      }
+      const songKey = initialTitle.replace(/\s+/g, '_').toLowerCase();
+      const saved = localStorage.getItem(`confieso_card_index_${songKey}_all`);
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+    } catch (e) {
+      console.error("Failed to load initial card index", e);
+    }
+    return 0;
+  });
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [knownRates, setKnownRates] = useState<Record<number, 'easy' | 'medium' | 'hard'>>({}); // cardId -> rating
+
+  const [autoPlayOnCardChange, setAutoPlayOnCardChange] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('confieso_auto_play_on_card_change');
+      return saved !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const [isRandomCardOn, setIsRandomCardOn] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('confieso_random_card_on');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [isSpacedRepOn, setIsSpacedRepOn] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('confieso_spaced_rep_on');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [cardHistory, setCardHistory] = useState<number[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem('confieso_auto_play_on_card_change', autoPlayOnCardChange.toString());
+  }, [autoPlayOnCardChange]);
+
+  useEffect(() => {
+    localStorage.setItem('confieso_random_card_on', isRandomCardOn.toString());
+  }, [isRandomCardOn]);
+
+  useEffect(() => {
+    localStorage.setItem('confieso_spaced_rep_on', isSpacedRepOn.toString());
+  }, [isSpacedRepOn]);
+
+  useEffect(() => {
+    setCardHistory([]);
+  }, [currentDeck]);
   
   // Audio configuration states
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const [autoStopAfterPhrase, setAutoStopAfterPhrase] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('confieso_auto_stop_after_phrase');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('confieso_auto_stop_after_phrase', autoStopAfterPhrase.toString());
+  }, [autoStopAfterPhrase]);
 
   // Media Player configuration (YouTube + Local File)
   const [localFileUrl, setLocalFileUrl] = useState<string>('');
@@ -989,6 +1291,136 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
   const [ytTrigger, setYtTrigger] = useState<number>(0);
   const [dragActive, setDragActive] = useState<boolean>(false);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const ytPlayerInstanceRef = useRef<any>(null);
+  const pendingSeekRef = useRef<number | null>(null);
+
+  // Load YouTube script on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        document.head.appendChild(tag);
+      }
+    }
+  }, []);
+
+  // Initialize YT Player when api ready and video changes
+  useEffect(() => {
+    let player: any = null;
+    
+    const initPlayer = () => {
+      if (!songData.youtubeId || typeof window === 'undefined' || !(window as any).YT || !(window as any).YT.Player) return;
+      
+      const container = document.getElementById('yt-player-container');
+      if (!container) return; // Wait for element to mount
+      
+      if (ytPlayerInstanceRef.current) {
+        try {
+          ytPlayerInstanceRef.current.destroy();
+        } catch (e) {
+          console.error("Error destroying YT player", e);
+        }
+        ytPlayerInstanceRef.current = null;
+      }
+
+      // Create a div inside the container
+      container.innerHTML = '<div id="yt-player-placeholder"></div>';
+      
+      try {
+        player = new (window as any).YT.Player('yt-player-placeholder', {
+          videoId: songData.youtubeId,
+          width: '100%',
+          height: '100%',
+          playerVars: {
+            autoplay: 1,
+            start: ytStart,
+            rel: 0,
+            controls: 1,
+            modestbranding: 1,
+            origin: window.location.origin
+          },
+          events: {
+            onReady: (event: any) => {
+              ytPlayerInstanceRef.current = event.target;
+              if (pendingSeekRef.current !== null) {
+                event.target.seekTo(pendingSeekRef.current, true);
+                event.target.playVideo();
+                pendingSeekRef.current = null;
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to construct YT player", e);
+      }
+    };
+
+    if (mediaPlayerType === 'youtube') {
+      if ((window as any).YT && (window as any).YT.Player) {
+        const t = setTimeout(initPlayer, 100);
+        return () => clearTimeout(t);
+      } else {
+        const prevCallback = (window as any).onYouTubeIframeAPIReady;
+        (window as any).onYouTubeIframeAPIReady = () => {
+          if (prevCallback) prevCallback();
+          initPlayer();
+        };
+      }
+    }
+
+    return () => {
+      if (player) {
+        try {
+          player.destroy();
+        } catch (e) {}
+        ytPlayerInstanceRef.current = null;
+      }
+    };
+  }, [songData.youtubeId, mediaPlayerType]);
+
+  // Filtered Cards based on active Category Deck
+  const filteredPhrases = songData.phrases.filter(phrase => {
+    if (currentDeck === 'All') return true;
+    if (currentDeck === 'Starred') return starredIds.includes(phrase.id);
+    return phrase.category.toLowerCase().includes(currentDeck.toLowerCase());
+  });
+
+  const activePhrase: Phrase | undefined = filteredPhrases[cardIndex];
+
+  // Handle active phrase auto stop
+  useEffect(() => {
+    if (!autoStopAfterPhrase || !activePhrase) return;
+    
+    const endTime = getPhraseEndTime(activePhrase);
+    
+    const interval = setInterval(() => {
+      // 1. Check local video player
+      if (mediaPlayerType === 'local' && videoPlayerRef.current) {
+        const curr = videoPlayerRef.current.currentTime;
+        if (curr >= endTime && curr < endTime + 2 && !videoPlayerRef.current.paused) {
+          videoPlayerRef.current.pause();
+        }
+      } 
+      // 2. Check YouTube player
+      else if (mediaPlayerType === 'youtube' && ytPlayerInstanceRef.current && typeof ytPlayerInstanceRef.current.getCurrentTime === 'function') {
+        try {
+          const state = ytPlayerInstanceRef.current.getPlayerState();
+          if (state === 1) { // 1 is playing
+            const curr = ytPlayerInstanceRef.current.getCurrentTime();
+            if (curr >= endTime && curr < endTime + 2) {
+              ytPlayerInstanceRef.current.pauseVideo();
+            }
+          }
+        } catch (e) {}
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [autoStopAfterPhrase, activePhrase, mediaPlayerType, songData.phrases]);
 
   // Quiz Mode states
   const [quizScore, setQuizScore] = useState<number>(0);
@@ -1023,13 +1455,31 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
         setKnownRates({});
       }
 
-      setCardIndex(0);
-      setIsFlipped(false);
+      // Reset to All deck first
       setCurrentDeck('All');
+
+      // Load saved index for 'all' deck
+      const savedCardIndex = localStorage.getItem(`confieso_card_index_${songKey}_all`);
+      if (savedCardIndex) {
+        const parsedIdx = parseInt(savedCardIndex, 10);
+        setCardIndex(parsedIdx >= 0 ? parsedIdx : 0);
+      } else {
+        setCardIndex(0);
+      }
+      setIsFlipped(false);
     } catch (e) {
       console.error("Error reading from localStorage", e);
     }
   }, [songData.title]);
+
+  // Save active cardIndex to localStorage
+  useEffect(() => {
+    if (cardIndex >= 0) {
+      const songKey = songData.title.replace(/\s+/g, '_').toLowerCase();
+      const deckKey = currentDeck.toLowerCase();
+      localStorage.setItem(`confieso_card_index_${songKey}_${deckKey}`, cardIndex.toString());
+    }
+  }, [cardIndex, songData.title, currentDeck]);
 
   // Save Starred Progress to localStorage
   useEffect(() => {
@@ -1042,15 +1492,6 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     const songKey = songData.title.replace(/\s+/g, '_').toLowerCase();
     localStorage.setItem(`confieso_rates_${songKey}`, JSON.stringify(knownRates));
   }, [knownRates, songData.title]);
-
-  // Filtered Cards based on active Category Deck
-  const filteredPhrases = songData.phrases.filter(phrase => {
-    if (currentDeck === 'All') return true;
-    if (currentDeck === 'Starred') return starredIds.includes(phrase.id);
-    return phrase.category.toLowerCase().includes(currentDeck.toLowerCase());
-  });
-
-  const activePhrase: Phrase | undefined = filteredPhrases[cardIndex];
 
   // Keep card index synced to active card ID if the underlying array changes or reorders
   const lastActiveIdRef = useRef<number | null>(null);
@@ -1095,11 +1536,34 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     return list;
   }, [songData.phrases]);
 
-  // Clean index bounds when switching study decks
+  // Load or clean index bounds when switching study decks
   useEffect(() => {
-    setCardIndex(0);
-    setIsFlipped(false);
+    try {
+      const songKey = songData.title.replace(/\s+/g, '_').toLowerCase();
+      const deckKey = currentDeck.toLowerCase();
+      const savedCardIndex = localStorage.getItem(`confieso_card_index_${songKey}_${deckKey}`);
+      if (savedCardIndex) {
+        const parsedIdx = parseInt(savedCardIndex, 10);
+        if (!isNaN(parsedIdx) && parsedIdx >= 0) {
+          setCardIndex(parsedIdx);
+        } else {
+          setCardIndex(0);
+        }
+      } else {
+        setCardIndex(0);
+      }
+      setIsFlipped(false);
+    } catch (e) {
+      console.error("Error restoring deck card index", e);
+    }
   }, [currentDeck]);
+
+  // Bounds safety guard to make sure cardIndex doesn't exceed filteredPhrases length
+  useEffect(() => {
+    if (filteredPhrases.length > 0 && cardIndex >= filteredPhrases.length) {
+      setCardIndex(0);
+    }
+  }, [cardIndex, filteredPhrases.length]);
 
   // Dual Player Jump to Timestamp Handler
   const playAtTimestamp = (seconds: number) => {
@@ -1107,20 +1571,33 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
       videoPlayerRef.current.currentTime = seconds;
       videoPlayerRef.current.play().catch(e => console.log("Auto-play blocked or seeking complete.", e));
     } else {
-      // For YouTube, update the start query parameter of the iframe.
-      // Must be a whole integer because YouTube's embed 'start' parameter only accepts integers!
-      // If we pass a float (e.g. 18.1), YouTube will reject it and fall back to 0 (beginning of song).
-      setYtStart(Math.floor(seconds));
-      setYtTrigger(prev => prev + 1);
+      if (ytPlayerInstanceRef.current && typeof ytPlayerInstanceRef.current.seekTo === 'function') {
+        ytPlayerInstanceRef.current.seekTo(seconds, true);
+        ytPlayerInstanceRef.current.playVideo();
+      } else {
+        pendingSeekRef.current = seconds;
+        // For YouTube, update the start query parameter of the iframe.
+        // Must be a whole integer because YouTube's embed 'start' parameter only accepts integers!
+        // If we pass a float (e.g. 18.1), YouTube will reject it and fall back to 0 (beginning of song).
+        setYtStart(Math.floor(seconds));
+        setYtTrigger(prev => prev + 1);
+      }
     }
   };
+
+  const lastPlayedIdRef = useRef<number | null>(null);
 
   // Trigger timestamp sync on phrase change if we are studying in flashcards or lyrics tab
   useEffect(() => {
     if (activePhrase && (activeTab === 'flashcards' || activeTab === 'lyrics')) {
-      playAtTimestamp(activePhrase.timestamp);
+      if (lastPlayedIdRef.current !== activePhrase.id) {
+        lastPlayedIdRef.current = activePhrase.id;
+        if (autoPlayOnCardChange) {
+          playAtTimestamp(activePhrase.timestamp);
+        }
+      }
     }
-  }, [cardIndex, currentDeck, activeTab]);
+  }, [activePhrase?.id, activeTab, autoPlayOnCardChange]);
 
   // Generate Quiz Question
   const generateQuiz = (overrideTurn?: 'partner-a' | 'partner-b') => {
@@ -1242,7 +1719,45 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     if (filteredPhrases.length === 0) return;
     setIsFlipped(false);
     setTimeout(() => {
-      setCardIndex((prev) => (prev + 1) % filteredPhrases.length);
+      setCardIndex((prev) => {
+        // Save current index in history
+        setCardHistory(h => [...h, prev]);
+        
+        if (filteredPhrases.length <= 1) return 0;
+        
+        if (isSpacedRepOn) {
+          // Weighted random selection based on SRS (Spaced Repetition System)
+          // weights: hard = 10, unrated = 7, medium = 4, easy = 1
+          const weights = filteredPhrases.map((p, idx) => {
+            if (idx === prev) return 0;
+            const rate = knownRates[p.id];
+            if (rate === 'hard') return 10;
+            if (rate === 'medium') return 4;
+            if (rate === 'easy') return 1;
+            return 7; // unrated
+          });
+          
+          const totalWeight = weights.reduce((a, b) => a + b, 0);
+          if (totalWeight === 0) {
+            return (prev + 1) % filteredPhrases.length;
+          }
+          
+          let randomNum = Math.random() * totalWeight;
+          for (let i = 0; i < filteredPhrases.length; i++) {
+            randomNum -= weights[i];
+            if (randomNum <= 0) {
+              return i;
+            }
+          }
+          return (prev + 1) % filteredPhrases.length;
+        } else if (isRandomCardOn) {
+          const indices = Array.from({ length: filteredPhrases.length }, (_, i) => i).filter(i => i !== prev);
+          if (indices.length === 0) return 0;
+          return indices[Math.floor(Math.random() * indices.length)];
+        } else {
+          return (prev + 1) % filteredPhrases.length;
+        }
+      });
     }, 150);
   };
 
@@ -1250,7 +1765,17 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     if (filteredPhrases.length === 0) return;
     setIsFlipped(false);
     setTimeout(() => {
-      setCardIndex((prev) => (prev - 1 + filteredPhrases.length) % filteredPhrases.length);
+      setCardHistory((h) => {
+        if (h.length > 0) {
+          const newHistory = [...h];
+          const lastIdx = newHistory.pop()!;
+          setCardIndex(lastIdx);
+          return newHistory;
+        } else {
+          setCardIndex((prev) => (prev - 1 + filteredPhrases.length) % filteredPhrases.length);
+          return h;
+        }
+      });
     }, 150);
   };
 
@@ -1317,6 +1842,72 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     if (targetIdx !== -1) {
       const targetNewSec = Math.max(0, parseFloat((songData.phrases[targetIdx].timestamp + amount).toFixed(2)));
       playAtTimestamp(targetNewSec);
+    }
+  };
+
+  const getPhraseEndTime = (phrase: Phrase) => {
+    if (phrase.timestampEnd !== undefined) {
+      return phrase.timestampEnd;
+    }
+    // Estimate based on next phrase
+    const idx = songData.phrases.findIndex(p => p.id === phrase.id);
+    if (idx !== -1 && idx < songData.phrases.length - 1) {
+      const nextPhrase = songData.phrases[idx + 1];
+      const diff = nextPhrase.timestamp - phrase.timestamp;
+      if (diff > 0 && diff < 8) {
+        return nextPhrase.timestamp - 0.2;
+      }
+    }
+    return phrase.timestamp + 3;
+  };
+
+  const adjustActivePhraseEndTimestamp = (amount: number) => {
+    if (!activePhrase) return;
+    const currentId = activePhrase.id;
+    
+    const formatTime = (totalSecs: number) => {
+      const minutes = Math.floor(totalSecs / 60);
+      const seconds = Math.floor(totalSecs % 60);
+      const msFraction = Math.round((totalSecs % 1) * 10);
+      let str = `${minutes}:${String(seconds).padStart(2, '0')}`;
+      if (msFraction > 0) {
+        str += `.${msFraction}`;
+      }
+      return str;
+    };
+
+    setSongData((prev) => {
+      const idx = prev.phrases.findIndex(p => p.id === currentId);
+      if (idx === -1) return prev;
+
+      const updatedPhrases = prev.phrases.map((p) => ({ ...p }));
+      const target = updatedPhrases[idx];
+      
+      const currentEnd = typeof target.timestampEnd === 'number' ? target.timestampEnd : getPhraseEndTime(target);
+      const targetNewEndSec = Math.max(target.timestamp + 0.2, parseFloat((currentEnd + amount).toFixed(2)));
+      
+      target.timestampEnd = targetNewEndSec;
+      target.timestampEndStr = formatTime(targetNewEndSec);
+
+      const updatedSong = {
+        ...prev,
+        phrases: updatedPhrases,
+      };
+
+      localStorage.setItem('confieso_custom_song', JSON.stringify(updatedSong));
+      return updatedSong;
+    });
+
+    // Directly seek the media player to play the ending segment for instant feedback
+    const targetIdx = songData.phrases.findIndex(p => p.id === currentId);
+    if (targetIdx !== -1) {
+      const targetPhrase = songData.phrases[targetIdx];
+      const currentEnd = typeof targetPhrase.timestampEnd === 'number' ? targetPhrase.timestampEnd : getPhraseEndTime(targetPhrase);
+      const targetNewEndSec = Math.max(targetPhrase.timestamp + 0.2, parseFloat((currentEnd + amount).toFixed(2)));
+      
+      // Seek to 1.5s before the new end timestamp, or start of the phrase, whichever is later
+      const playStart = Math.max(targetPhrase.timestamp, targetNewEndSec - 1.5);
+      playAtTimestamp(playStart);
     }
   };
 
@@ -1588,8 +2179,15 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   </div>
                   <button
                     onClick={() => {
-                      setSongInputJson(JSON.stringify({
-                        title: "New Song Title",
+                      let uniqueTitle = "New Song Title";
+                      let count = 1;
+                      while (savedSongs.some(s => s.title.toLowerCase().trim() === uniqueTitle.toLowerCase().trim() && s.artist.toLowerCase().trim() === "artist name")) {
+                        count++;
+                        uniqueTitle = `New Song Title ${count}`;
+                      }
+
+                      const blankSong = {
+                        title: uniqueTitle,
                         artist: "Artist Name",
                         youtubeId: "YOUTUBE_VIDEO_ID",
                         phrases: [
@@ -1598,7 +2196,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                             spanish: "Spanish phrase here",
                             english: "English translation here",
                             literal: "Literal breakdown here",
-                            category: "Intro / Verse 1 / Chorus",
+                            category: "Intro",
                             timestamp: 10,
                             timestampStr: "0:10",
                             breakdown: [
@@ -1613,8 +2211,13 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                             example: "Spanish phrase here"
                           }
                         ]
-                      }, null, 2));
+                      };
+
+                      setSongData(blankSong);
+                      setSongInputJson(JSON.stringify(blankSong, null, 2));
                       setValidationError(null);
+                      setValidationSuccess(true);
+                      setTimeout(() => setValidationSuccess(false), 4000);
                     }}
                     className="bg-slate-900 hover:bg-slate-850 text-slate-350 font-bold text-[10px] sm:text-xs px-3 py-2 rounded-xl border border-slate-800 transition flex items-center gap-1.5 cursor-pointer self-stretch sm:self-auto justify-center"
                   >
@@ -1703,26 +2306,51 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 {/* Left Side: Copilot Prompter */}
                 <div className="lg:col-span-5 space-y-4">
                   <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850 space-y-3.5">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
                       <span className="text-xs font-bold text-indigo-300 tracking-wide uppercase flex items-center gap-1.5">
                         <Sparkle className="w-4 h-4 text-indigo-400 animate-pulse" /> Gemini AI Prompt Copilot
                       </span>
-                      <button
-                        id="copy-prompt-btn"
-                        onClick={() => {
-                          navigator.clipboard.writeText(activePromptText);
-                          setCopiedPrompt(true);
-                          setTimeout(() => setCopiedPrompt(false), 2000);
-                        }}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                          copiedPrompt 
-                            ? 'bg-emerald-500 text-slate-950' 
-                            : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
-                        }`}
-                      >
-                        {copiedPrompt ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedPrompt ? 'Copied Prompt!' : 'Copy Prompt'}</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          id="copy-prompt-btn"
+                          onClick={() => {
+                            try {
+                              navigator.clipboard.writeText(activePromptText).catch(() => {
+                                // Ignore or handle silent fail
+                              });
+                            } catch (e) {
+                              // Ignore or handle silent fail
+                            }
+                            setCopiedPrompt(true);
+                            setTimeout(() => setCopiedPrompt(false), 2000);
+                          }}
+                          className={`text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                            copiedPrompt 
+                              ? 'bg-emerald-500 text-slate-950' 
+                              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          {copiedPrompt ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedPrompt ? 'Copied!' : 'Copy'}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const element = document.createElement("a");
+                            const file = new Blob([activePromptText], {type: 'text/plain;charset=utf-8'});
+                            element.href = URL.createObjectURL(file);
+                            const cleanName = (promptSongName || songData.title || "video").toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                            element.download = `${cleanName}_gemini_prompt.txt`;
+                            document.body.appendChild(element);
+                            element.click();
+                            document.body.removeChild(element);
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/30 text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer"
+                          title="Download prompt as a .txt file to upload or drag into Gemini"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download Prompt File</span>
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-xs text-slate-400 leading-relaxed">
@@ -1847,6 +2475,42 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                           onChange={(e) => setPromptTranscript(e.target.value)}
                           className="w-full h-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-slate-300 focus:border-indigo-500 outline-none placeholder:text-slate-600 resize-none"
                         />
+                        
+                        {/* Drag and Drop / Click Transcript File Uploader */}
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          <div className="flex justify-between items-center text-[9px] text-slate-500">
+                            <span>Or import downloaded transcript file:</span>
+                            <span className="font-mono text-teal-500">Supports .html, .txt, .srt, .bin</span>
+                          </div>
+                          
+                          <label 
+                            onDragOver={(e) => { e.preventDefault(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                handleTranscriptFileUpload(e.dataTransfer.files[0]);
+                              }
+                            }}
+                            className="group flex flex-col items-center justify-center border border-dashed border-slate-800 hover:border-indigo-500/60 bg-slate-950/40 hover:bg-slate-900/30 p-2.5 rounded-xl transition cursor-pointer text-center"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <Upload className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400 transition" />
+                              <span className="text-[10px] font-medium text-slate-400 group-hover:text-slate-200 transition">
+                                Click or drag & drop HTML / Text / Bin transcript file
+                              </span>
+                            </div>
+                            <input
+                              type="file"
+                              accept=".html,.htm,.txt,.srt,.bin"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleTranscriptFileUpload(e.target.files[0]);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
                       </div>
                     </div>
 
@@ -2277,7 +2941,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       
                       {/* FRONT CARD (DYNAMIC PROMPT BASED ON ROLE) */}
                       <div 
-                        className="absolute inset-0 gradient-border glass-card p-6 sm:p-10 flex flex-col justify-between shadow-2xl overflow-hidden transition-all duration-300"
+                        className={`absolute inset-0 gradient-border glass-card active-phrase ${isPlayingAudio ? 'is-playing' : ''} p-6 sm:p-10 flex flex-col justify-between shadow-2xl overflow-hidden transition-all duration-300`}
                         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
                       >
                         <div className="flex justify-between items-start">
@@ -2339,24 +3003,43 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         </div>
 
                         <div className="flex items-center justify-between border-t border-slate-800/60 pt-4 text-xs text-slate-400">
-                          <button 
-                            id="jump-time-btn"
-                            className="flex items-center gap-2 hover:text-teal-300 transition text-slate-300 text-xs bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-teal-500/30" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              playAtTimestamp(activePhrase.timestamp);
-                            }}
-                          >
-                            <Music className="w-3.5 h-3.5 text-teal-400" />
-                            <span>{t('play_from_timestamp')} <strong>{activePhrase.timestampStr}</strong></span>
-                          </button>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button 
+                              id="jump-time-btn"
+                              className="flex items-center gap-2 hover:text-teal-300 transition text-slate-300 text-xs bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-teal-500/30 cursor-pointer" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playAtTimestamp(activePhrase.timestamp);
+                              }}
+                            >
+                              <Music className="w-3.5 h-3.5 text-teal-400" />
+                              <span>{t('play_from_timestamp')} <strong>{activePhrase.timestampStr}</strong></span>
+                            </button>
+
+                            <button
+                              id="autoplay-toggle-btn-front"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAutoPlayOnCardChange(p => !p);
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 border text-[10px] uppercase tracking-wider cursor-pointer ${
+                                autoPlayOnCardChange
+                                  ? 'bg-emerald-950/40 text-emerald-300 border-emerald-900/50 hover:bg-emerald-900/20'
+                                  : 'bg-slate-950/80 text-slate-400 border-slate-850 hover:border-slate-800 hover:text-slate-300'
+                              }`}
+                              title={autoPlayOnCardChange ? "Autoplay is Enabled when changing cards" : "Autoplay is Disabled when changing cards"}
+                            >
+                              <div className={`w-1.5 h-1.5 rounded-full ${autoPlayOnCardChange ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                              <span>Auto-play: {autoPlayOnCardChange ? 'On' : 'Off'}</span>
+                            </button>
+                          </div>
                           <span className="text-[10px] uppercase font-bold text-slate-600">{t('front_card')}</span>
                         </div>
                       </div>
 
                       {/* BACK CARD (ROLE SWAPPED EXPLANATION & SPEECH) */}
                       <div 
-                        className="absolute inset-0 gradient-border glass-card p-6 sm:p-10 flex flex-col justify-between shadow-2xl overflow-hidden transition-all duration-300"
+                        className={`absolute inset-0 gradient-border glass-card active-phrase ${isPlayingAudio ? 'is-playing' : ''} p-6 sm:p-10 flex flex-col justify-between shadow-2xl overflow-hidden transition-all duration-300`}
                         style={{ 
                           backfaceVisibility: 'hidden', 
                           WebkitBackfaceVisibility: 'hidden',
@@ -2471,6 +3154,62 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         <span>Easy / Mastered</span>
                       </button>
                     </div>
+                  </div>
+
+                  {/* STUDY MODES / SRS / RANDOM CONFIG */}
+                  <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Card Traversal Mode</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">
+                        {isSpacedRepOn ? 'Active: Spaced Rep' : isRandomCardOn ? 'Active: Random Shuffle' : 'Active: Sequential'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Random Card Toggle */}
+                      <button
+                        id="random-card-toggle"
+                        onClick={() => {
+                          setIsRandomCardOn(p => !p);
+                          if (!isRandomCardOn) {
+                            setIsSpacedRepOn(false);
+                          }
+                        }}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          isRandomCardOn
+                            ? 'bg-indigo-950/40 text-indigo-300 border-indigo-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-indigo-400 hover:border-slate-800'
+                        }`}
+                        title="When enabled, cards will appear in a random order"
+                      >
+                        <Shuffle className={`w-3.5 h-3.5 ${isRandomCardOn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`} />
+                        <span>Random: {isRandomCardOn ? 'On' : 'Off'}</span>
+                      </button>
+
+                      {/* Spaced Repetition Toggle */}
+                      <button
+                        id="spaced-rep-toggle"
+                        onClick={() => {
+                          setIsSpacedRepOn(p => !p);
+                          if (!isSpacedRepOn) {
+                            setIsRandomCardOn(false);
+                          }
+                        }}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          isSpacedRepOn
+                            ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-emerald-400 hover:border-slate-800'
+                        }`}
+                        title="Intelligent spaced repetition system that schedules difficult and unrated phrases more frequently"
+                      >
+                        <Layers className={`w-3.5 h-3.5 ${isSpacedRepOn ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+                        <span>Spaced Rep: {isSpacedRepOn ? 'On' : 'Off'}</span>
+                      </button>
+                    </div>
+                    {isSpacedRepOn && (
+                      <p className="text-[10px] text-slate-400 text-center leading-normal italic">
+                        🎓 Prioritizes cards rated <span className="text-rose-400 font-bold">Hard</span> & unrated cards over <span className="text-emerald-400 font-bold">Easy</span> cards based on your historical answers.
+                      </p>
+                    )}
                   </div>
 
                   {/* CARDS ACTION CONTROLS */}
@@ -3021,35 +3760,97 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 <AnimatePresence initial={false}>
                   {showTrimControls && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                      exit={{ opacity: 0, height: 0, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex items-center gap-2 w-full sm:w-auto justify-end sm:ml-auto border-t sm:border-t-0 border-slate-800/40 pt-2 sm:pt-0 overflow-hidden"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="w-full border-t border-slate-800/60 pt-3 mt-3 space-y-3"
                     >
-                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{t('trim_time')}:</span>
-                      <button
-                        id="trim-minus-btn-fc"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          adjustActivePhraseTimestamp(-0.5);
-                        }}
-                        className="flex-1 sm:flex-initial bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/60 text-rose-300 font-bold px-3 py-1.5 rounded-xl transition active:scale-95 flex items-center justify-center gap-1 text-xs"
-                        title="Adjust sync -0.5s (earlier)"
-                      >
-                        -0.5s
-                      </button>
-                      <button
-                        id="trim-plus-btn-fc"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          adjustActivePhraseTimestamp(0.5);
-                        }}
-                        className="flex-1 sm:flex-initial bg-slate-900 hover:bg-emerald-950/30 border border-slate-800 hover:border-emerald-900/60 text-emerald-300 font-bold px-3 py-1.5 rounded-xl transition active:scale-95 flex items-center justify-center gap-1 text-xs"
-                        title="Adjust sync +0.5s (later)"
-                      >
-                        +0.5s
-                      </button>
+                      {/* Start Time Trim Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850/60 w-full">
+                        <div className="text-left">
+                          <span className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Start Trim</span>
+                          <div className="text-slate-300 font-semibold font-mono text-xs mt-0.5">
+                            Start Time: {activePhrase.timestampStr}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            id="trim-start-minus-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adjustActivePhraseTimestamp(-0.5);
+                            }}
+                            className="bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/40 text-rose-350 font-bold px-3 py-1.5 rounded-lg transition text-xs cursor-pointer flex-1 sm:flex-initial text-center"
+                            title="Start time -0.5s"
+                          >
+                            -0.5s
+                          </button>
+                          <button
+                            id="trim-start-plus-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adjustActivePhraseTimestamp(0.5);
+                            }}
+                            className="bg-slate-900 hover:bg-emerald-950/30 border border-slate-800 hover:border-emerald-900/40 text-emerald-350 font-bold px-3 py-1.5 rounded-lg transition text-xs cursor-pointer flex-1 sm:flex-initial text-center"
+                            title="Start time +0.5s"
+                          >
+                            +0.5s
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* End Time Trim Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850/60 w-full">
+                        <div className="text-left">
+                          <span className="text-[10px] text-teal-400 uppercase font-bold tracking-wider">End Trim (Auto-Stop Target)</span>
+                          <div className="text-slate-300 font-semibold font-mono text-xs mt-0.5">
+                            End Time: {activePhrase.timestampEndStr || formatTimeSeconds(getPhraseEndTime(activePhrase))} {activePhrase.timestampEnd === undefined && <span className="text-[10px] text-slate-500 font-normal italic">(Estimated)</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            id="trim-end-minus-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adjustActivePhraseEndTimestamp(-0.5);
+                            }}
+                            className="bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/40 text-rose-350 font-bold px-3 py-1.5 rounded-lg transition text-xs cursor-pointer flex-1 sm:flex-initial text-center"
+                            title="End time -0.5s"
+                          >
+                            -0.5s
+                          </button>
+                          <button
+                            id="trim-end-plus-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adjustActivePhraseEndTimestamp(0.5);
+                            }}
+                            className="bg-slate-900 hover:bg-emerald-950/30 border border-slate-800 hover:border-emerald-900/40 text-emerald-350 font-bold px-3 py-1.5 rounded-lg transition text-xs cursor-pointer flex-1 sm:flex-initial text-center"
+                            title="End time +0.5s"
+                          >
+                            +0.5s
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Playback mode setting in drawer */}
+                      <div className="flex items-center justify-between gap-2 bg-slate-950/20 p-2 rounded-xl border border-slate-850/30 w-full">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Stop video after saying phrase:</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAutoStopAfterPhrase(p => !p);
+                          }}
+                          className={`px-3 py-1 rounded-lg font-bold transition text-[10px] uppercase tracking-wider border cursor-pointer ${
+                            autoStopAfterPhrase
+                              ? 'bg-rose-950/35 text-rose-300 border-rose-900/50'
+                              : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          {autoStopAfterPhrase ? 'Enabled' : 'Disabled'}
+                        </button>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -3135,18 +3936,36 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               </div>
             </div>
 
+            {/* Playback mode settings */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/40 p-3 rounded-2xl border border-slate-850 text-xs">
+              <span className="text-slate-400 font-medium">Video Playback Mode:</span>
+              <button
+                onClick={() => setAutoStopAfterPhrase(prev => !prev)}
+                className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 border text-[11px] cursor-pointer ${
+                  autoStopAfterPhrase
+                    ? 'bg-rose-950/30 text-rose-300 border-rose-900/50'
+                    : 'bg-emerald-950/30 text-emerald-300 border-emerald-900/50'
+                }`}
+              >
+                {autoStopAfterPhrase ? (
+                  <>
+                    <X className="w-3.5 h-3.5 text-rose-400" /> Stop after phrase
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 text-emerald-400" /> Continuous play
+                  </>
+                )}
+              </button>
+            </div>
+
             {/* IFRAME YOUTUBE COMPONENT */}
             {mediaPlayerType === 'youtube' && (
               <div className="space-y-4">
                 <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-slate-950 shadow-inner">
-                  <iframe
-                    id="youtube-player-frame"
-                    key={`yt-player-${ytStart}-${ytTrigger}`}
-                    src={`https://www.youtube.com/embed/${songData.youtubeId}?start=${ytStart}&autoplay=1&rel=0`}
-                    title={`${songData.title} YouTube Video`}
-                    className="absolute inset-0 w-full h-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
+                  <div
+                    id="yt-player-container"
+                    className="absolute inset-0 w-full h-full"
                   />
                 </div>
 
@@ -3265,7 +4084,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
           {/* ACTIVE CARD DIALOG EXPLANATION CARD (HELPFUL SIDE PANEL) */}
           {activePhrase && activeTab === 'flashcards' && (
-            <div className="glass-card p-6 rounded-3xl space-y-3 shadow-xl">
+            <div className={`glass-card active-phrase ${isPlayingAudio ? 'is-playing' : ''} p-6 rounded-3xl space-y-3 shadow-xl transition-all duration-300`}>
               <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-400">
                 <Info className="w-4 h-4" />
                 <span>ACTIVE LYRIC STUDY TIP:</span>

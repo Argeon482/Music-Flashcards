@@ -21,6 +21,41 @@ body {
   border: 1px solid rgba(51, 65, 85, 0.4);
 }
 
+@keyframes border-glow {
+  0%, 100% {
+    border-color: rgba(45, 212, 191, 0.4); /* teal-400 */
+    box-shadow: 0 0 15px rgba(45, 212, 191, 0.15), inset 0 0 10px rgba(45, 212, 191, 0.05);
+    background: rgba(15, 23, 42, 0.85);
+  }
+  50% {
+    border-color: rgba(99, 102, 241, 0.7); /* indigo-500 */
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.3), inset 0 0 15px rgba(99, 102, 241, 0.1);
+    background: rgba(20, 24, 52, 0.9);
+  }
+}
+
+@keyframes playing-pulse {
+  0%, 100% {
+    background: rgba(20, 24, 52, 0.9);
+    border-color: rgba(251, 113, 133, 0.6); /* rose-400 */
+    box-shadow: 0 0 30px rgba(251, 113, 133, 0.4), inset 0 0 20px rgba(251, 113, 133, 0.15);
+  }
+  50% {
+    background: rgba(30, 20, 45, 0.95);
+    border-color: rgba(45, 212, 191, 0.8); /* teal-400 */
+    box-shadow: 0 0 45px rgba(45, 212, 191, 0.6), inset 0 0 25px rgba(45, 212, 191, 0.25);
+  }
+}
+
+.glass-card.active-phrase {
+  animation: border-glow 4s ease-in-out infinite;
+  transition: all 0.5s ease-in-out;
+}
+
+.glass-card.active-phrase.is-playing {
+  animation: playing-pulse 2.2s ease-in-out infinite;
+}
+
 .gradient-border {
   border-radius: 1.5rem;
 }
