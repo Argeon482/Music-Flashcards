@@ -751,27 +751,56 @@ export default function App() {
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
+    let touchStartAtTop = false;
+    let touchStartY = 0;
     
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       
-      if (currentScrollY <= 15) {
-        // Always show details at the very top of the page
-        setShowHeaderDetails(true);
-      } else if (currentScrollY > lastScrollY && currentScrollY > 50) {
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
         // Scrolling down past 50px - hide details for more space
         setShowHeaderDetails(false);
-      } else if (currentScrollY < lastScrollY) {
-        // Scrolling up - show details when scrolled back up near the top
-        if (currentScrollY < 40) {
-          setShowHeaderDetails(true);
-        }
       }
       lastScrollY = currentScrollY;
     };
 
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        touchStartY = e.touches[0].clientY;
+        // Check if we are already at the top when the touch begins
+        touchStartAtTop = window.scrollY <= 5;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0 && touchStartAtTop) {
+        const currentY = e.touches[0].clientY;
+        const deltaY = currentY - touchStartY;
+        // If they swipe down (finger moving down, deltaY > 0) by a reasonable threshold
+        if (deltaY > 40 && window.scrollY <= 5) {
+          setShowHeaderDetails(true);
+        }
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      // If we are at the top of the page and scrolling up (deltaY < 0)
+      if (window.scrollY <= 5 && e.deltaY < -5) {
+        setShowHeaderDetails(true);
+      }
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('wheel', handleWheel);
+    };
   }, []);
 
   const [songInputJson, setSongInputJson] = useState<string>('');
