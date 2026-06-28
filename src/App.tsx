@@ -1240,52 +1240,154 @@ export default function App() {
 
   // Helper to parse transcripts from HTML, text or SRT formats
   const parseTranscriptText = (text: string): { timestamp: number, timestampStr: string, text: string }[] => {
-    // Regex to find timestamps like 12:34, 1:23:45, [1:23], (1:23)
-    const timestampRegex = /(?:\[|\()?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\]|\))?/g;
-    
-    const matches: { index: number, text: string, timestamp: number, timestampStr: string }[] = [];
-    let match;
-    
-    while ((match = timestampRegex.exec(text)) !== null) {
-      const hours = match[1] ? parseInt(match[1], 10) : 0;
-      const minutes = parseInt(match[2], 10);
-      const seconds = parseInt(match[3], 10);
-      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-      const timestampStr = match[0].replace(/[\[\]\(\)]/g, '').trim();
-      
-      matches.push({
-        index: match.index,
-        text: match[0],
-        timestamp: totalSeconds,
-        timestampStr: timestampStr
-      });
-    }
-    
+    if (!text) return [];
+
+    const lines = text.split(/\r?\n/);
     const results: { timestamp: number, timestampStr: string, text: string }[] = [];
     
-    for (let i = 0; i < matches.length; i++) {
-      const current = matches[i];
-      const nextIndex = i + 1 < matches.length ? matches[i + 1].index : text.length;
+    let currentTimestamp: number | null = null;
+    let currentTimestampStr = '';
+    
+    // Regex for matching VTT/SRT timing line start timestamps, e.g., "00:01:20.123" or "01:20.000" or "12:34"
+    const timeRegex = /(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\.(\d{3})|,\d{3})?/;
+    // Regex for matching inline timestamps at the beginning of a line, e.g., "[0:12] Hola" or "(1:23:45) Hello"
+    const inlineTimestampRegex = /^\s*(?:\[|\()?(\d{1,2}:)?(\d{1,2}):(\d{2})(?:\]|\))?\s*/;
+
+    for (let line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Skip WebVTT metadata headers, style rules, and regions
+      const isHeaderOrStyle = 
+        trimmed.startsWith('WEBVTT') || 
+        trimmed.startsWith('NOTE') || 
+        trimmed.startsWith('Style:') || 
+        trimmed.startsWith('Region:') || 
+        trimmed.startsWith('Kind:') || 
+        trimmed.startsWith('Language:') || 
+        trimmed.startsWith('X-TIMESTAMP-MAP') ||
+        trimmed.startsWith('::cue') ||
+        trimmed.includes('{') ||
+        trimmed.includes('}') ||
+        trimmed.includes('color:') ||
+        trimmed.startsWith('FILE') ||
+        trimmed.startsWith('TITLE') ||
+        trimmed.startsWith('AUTHOR');
+
+      if (isHeaderOrStyle) {
+        continue;
+      }
       
-      // Extract text between current timestamp and next timestamp
-      let segmentText = text.substring(current.index + current.text.length, nextIndex).trim();
-      
-      // Clean up segment text
-      segmentText = segmentText
-        .replace(/\r?\n/g, ' ')
+      // Skip SRT integer cue index numbers (lines containing ONLY digits)
+      if (/^\d+$/.test(trimmed)) {
+        continue;
+      }
+
+      // Check if it's a timing line containing "-->" (WebVTT or SRT)
+      if (trimmed.includes('-->')) {
+        const parts = trimmed.split('-->');
+        const startPart = parts[0].trim();
+        const match = timeRegex.exec(startPart);
+        if (match) {
+          const hours = match[1] ? parseInt(match[1], 10) : 0;
+          const minutes = parseInt(match[2], 10);
+          const seconds = parseInt(match[3], 10);
+          const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+          
+          let formattedStr = '';
+          if (hours > 0) {
+            formattedStr = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          } else {
+            formattedStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          }
+          
+          currentTimestamp = totalSeconds;
+          currentTimestampStr = formattedStr;
+        }
+        continue; // Skip the timing line itself
+      }
+
+      // If it's a regular text line, clean XML/HTML tags and styling (e.g. <v Speaker>, <c.yellow>, <i>)
+      let cleanLine = trimmed
+        .replace(/<[^>]+>/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-        
-      if (segmentText) {
-        results.push({
-          timestamp: current.timestamp,
-          timestampStr: current.timestampStr,
-          text: segmentText
-        });
+
+      if (!cleanLine) continue;
+
+      // Skip common non-speech subtitle cues (like [Music], (Laughter), [Applause])
+      const lower = cleanLine.toLowerCase();
+      if (lower === '[music]' || lower === '(music)' || lower === '[applause]' || lower === '(applause)' || lower === '[laughter]' || lower === '(laughter)') {
+        continue;
+      }
+
+      // Check if we have an active timestamp from a preceding "-->" timing line
+      if (currentTimestamp !== null) {
+        const existing = results.find(r => r.timestamp === currentTimestamp);
+        if (existing) {
+          // Merge multi-line captions for the same cue
+          existing.text = `${existing.text} ${cleanLine}`.trim();
+        } else {
+          results.push({
+            timestamp: currentTimestamp,
+            timestampStr: currentTimestampStr,
+            text: cleanLine
+          });
+        }
+      } else {
+        // If there was no timing line, check if the line starts with an inline timestamp (e.g., "[0:12] Hola")
+        const inlineMatch = inlineTimestampRegex.exec(trimmed);
+        if (inlineMatch) {
+          const hours = inlineMatch[1] ? parseInt(inlineMatch[1].replace(':', ''), 10) : 0;
+          const minutes = parseInt(inlineMatch[2], 10);
+          const seconds = parseInt(inlineMatch[3], 10);
+          const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+          
+          let formattedStr = '';
+          if (hours > 0) {
+            formattedStr = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          } else {
+            formattedStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          }
+
+          let textWithoutTimestamp = trimmed.replace(inlineMatch[0], '').trim();
+          textWithoutTimestamp = textWithoutTimestamp.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+          if (textWithoutTimestamp) {
+            results.push({
+              timestamp: totalSeconds,
+              timestampStr: formattedStr,
+              text: textWithoutTimestamp
+            });
+          }
+        } else {
+          // Fallback if no timestamp can be found: append to the previous line if possible
+          if (results.length > 0) {
+            results[results.length - 1].text = `${results[results.length - 1].text} ${cleanLine}`.trim();
+          } else {
+            results.push({
+              timestamp: 0,
+              timestampStr: "0:00",
+              text: cleanLine
+            });
+          }
+        }
       }
     }
-    
-    return results;
+
+    // Post-processing: Filter out duplicate sequential sentences (often found in auto-generated captions)
+    const finalResults: { timestamp: number, timestampStr: string, text: string }[] = [];
+    for (const res of results) {
+      if (finalResults.length > 0) {
+        const last = finalResults[finalResults.length - 1];
+        if (last.text === res.text) {
+          continue;
+        }
+      }
+      finalResults.push(res);
+    }
+
+    return finalResults;
   };
 
   const cleanTranscriptHTMLAndGetText = (htmlString: string): string => {
@@ -1306,6 +1408,89 @@ export default function App() {
     }
   };
 
+  const cleanTranscriptTextOfJunk = (rawText: string): string => {
+    if (!rawText.trim()) return rawText;
+
+    const lines = rawText.split(/\r?\n/);
+    const totalLines = lines.length;
+    if (totalLines < 4) return rawText;
+
+    const isPromoOrJunkLine = (text: string): boolean => {
+      const lower = text.toLowerCase().trim();
+      if (!lower) return false;
+
+      // 1. Raw URL check
+      const hasUrl = /https?:\/\/\S+|www\.\S+|\b\S+\.(?:com|net|org|co|tv|ly|me|us)\/\S*/i.test(text);
+      if (hasUrl) return true;
+
+      // 2. Specific domain/social check
+      const hasSocialDomain = /\b(?:patreon|instagram|facebook|twitter|tiktok|discord|paypal|spotify|apple|twitch|github|youtube|bit\.ly|youtu\.be)\b/i.test(text);
+      if (hasSocialDomain) return true;
+
+      // 3. Trailing junk keywords/phrases
+      const promoPhrases = [
+        'subscribe to',
+        'support my channel',
+        'support the channel',
+        'link in the description',
+        'links in the description',
+        'link down below',
+        'links down below',
+        'follow me on',
+        'my social media',
+        'check out my',
+        'buy my',
+        'merch store',
+        'get 10% off',
+        'discount code',
+        'promo code',
+        'use code',
+        'patreon',
+        'newsletter',
+        'all rights reserved',
+        'copyright'
+      ];
+      
+      for (const phrase of promoPhrases) {
+        if (lower.includes(phrase)) {
+          return true;
+        }
+      }
+      
+      return false;
+    };
+
+    let cutoffIndex = totalLines;
+    let cleanStreak = 0;
+    const midPoint = Math.floor(totalLines / 2);
+
+    for (let i = totalLines - 1; i >= 0; i--) {
+      if (i < midPoint) {
+        break;
+      }
+
+      if (isPromoOrJunkLine(lines[i])) {
+        cleanStreak = 0;
+        cutoffIndex = i;
+      } else {
+        cleanStreak++;
+        if (cleanStreak >= 3) {
+          break;
+        }
+      }
+    }
+
+    const trimmedLines = lines.slice(0, cutoffIndex);
+    const finalLines = trimmedLines.filter(line => {
+      const lower = line.toLowerCase().trim();
+      const isPureUrl = /^(https?:\/\/\S+|www\.\S+|\S+\.(?:com|org|net|co|ly)\S*)$/i.test(lower);
+      if (isPureUrl) return false;
+      return true;
+    });
+
+    return finalLines.join('\n');
+  };
+
   const handleTranscriptFileUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -1323,6 +1508,9 @@ export default function App() {
         if (looksLikeHtml) {
           plainText = cleanTranscriptHTMLAndGetText(content);
         }
+        
+        // Clean trailing junk from plain text transcript before parsing
+        plainText = cleanTranscriptTextOfJunk(plainText);
         
         const segments = parseTranscriptText(plainText);
         if (segments.length === 0) {
@@ -1442,35 +1630,39 @@ export default function App() {
     const cleanTitle = (promptSongName || songData.title || "Custom Lesson").split(' by ')[0] || "Custom Lesson";
     const cleanSpeaker = (promptSongName || songData.artist || "Speaker").split(' by ')[1] || "Speaker";
 
-    return `You are a professional language learning content engineer. Your task is to process the raw video transcript of any speech, dialogue, dialogue-heavy lesson, conversation, or song below and compile a high-fidelity bilingual study companion dataset in JSON format.
+    return `You are an expert language curriculum designer and professional learning content engineer. Your task is to process the raw video transcript of a lesson, dialogue, conversation, or speech below and compile a high-fidelity bilingual study companion dataset in JSON format.
 
-CRITICAL INSTRUCTIONS:
-1. Translate EVERY SINGLE phrase, spoken sentence, or lyrical line from the transcript sequentially. Do NOT skip any lines, do NOT summarize, and do NOT group lines. We require complete phrase-by-phrase coverage of the entire video.
-2. Determine and estimate timestamps extremely carefully so the interactive media playback and loop feature is pristine:
-   - "id": a sequential integer starting from 1.
-   - "spanish": The original line from the transcript in its exact original spelling (Target Language: ${promptTargetLangA}).
-     *CRITICAL NOTE FOR PARSING COMPATIBILITY*: You MUST keep the JSON key name as "spanish", even if the target language is ${promptTargetLangA}!
-   - "english": A natural, high-quality, readable translation in the native/translation language (Native Language: ${promptNativeLangA}).
-     *CRITICAL NOTE FOR PARSING COMPATIBILITY*: You MUST keep the JSON key name as "english", even if the native language is ${promptNativeLangA}!
-   - "literal": A literal, word-for-word translation showing exact alignment of grammar structures.
-   - "category": The topic, chapter, or section of the lesson (e.g. "Intro", "Part 1", "Main Lesson", "Outro").
-   - "timestamp": The exact start time of the phrase in total seconds (e.g., 1:15 becomes 75).
-   - "timestampStr": The string timestamp (e.g. "1:15" or "0:45").
-   - "timestampEnd": Precisely figure out and estimate the end timestamp of each phrase in total seconds. Do NOT blindly add a static 3 seconds. Look ahead to the subsequent line's start timestamp. The current phrase's end time should end right before the next phrase begins (usually 0.2 to 0.5 seconds before it, or when the spoken line naturally finishes), ensuring the application has clean, accurate start and end points for looped repetitions.
-   - "timestampEndStr": The string timestamp for the calculated end of the phrase (e.g. "1:18" or "0:48").
-   - "breakdown": An array of detailed word-by-word or chunk-by-chunk translation blocks for that phrase:
-     [ { "word": "Target Language word/chunk", "meaning": "Native Language translation" } ]
-     Include breakdowns for virtually every single word in the phrase so that nothing is left unexplained.
+CRITICAL CURRICULUM & INSTRUCTIONAL RULES:
+1. FOCUS ON EDUCATIONAL PHRASES, NOT VERBATIM CHIT-CHAT or FILLER:
+   - Identify the actual key target-language sentences, expressions, vocabulary, or idioms being actively taught, explained, or practiced in the video.
+   - Do NOT create cards for teacher-oriented meta-talk, administrative filler, or conversational padding (e.g., "Welcome back to the channel", "Make sure to subscribe", "In today's video, I'm going to explain..."). Ignore or skip these entirely.
+   - For teacher explanations, extract the focus sentence/word they are teaching as the card's target-language content. For example, if the teacher says: "To say 'I'm on my way' in Spanish, we say: Para decir voy en camino. I'm on my way, guys, I'm on my way.", the core target phrase should be extracted cleanly as "Voy en camino" (or "Para decir voy en camino") and translated cleanly as "To say 'I'm on my way'". Do NOT bundle repeated, rambling spoken English and Spanish words like "I'M ON MY WAY. I'M ON MY WAY. PERO VAMOS..." into the study phrases!
+   - Ensure target-language fields contain clean target-language text (${promptTargetLangA} only, in its correct spelling), and native fields contain clean translations (${promptNativeLangA}).
 
-3. Extract a comprehensive vocabulary list from the video transcript and place it in the "vocab" array:
-   - "word": The key verb (in base form), noun, adjective, slang, or grammar point from the lesson.
-   - "definition": A clear definition in ${promptNativeLangA}.
-   - "example": An example sentence demonstrating context, ideally inspired by or taken from the transcript.
+2. ELIMINATE REPETITION & CONSOLIDATE REPEATED CUES:
+   - If a word or phrase is repeated multiple times back-to-back for pronunciation or practice drills, merge or consolidate them into a single, high-quality, representative study phrase. Do NOT create multiple duplicate or near-identical sequential cards.
 
-CRITICAL FORMAT & DOWNLOAD REQUIREMENT:
-You MUST wrap your entire output in a single markdown code block (using \`\`\`json and \`\`\`) so that the Google Gemini user interface automatically renders the code block and provides a direct, one-click "Download" or "Copy" button to save it as a file.
-- Do NOT include any conversational preamble, introduction, or post-match explanations. The only text in your response must be the markdown block containing the valid JSON object.
-- Ensure the JSON is properly formatted and valid so it can be downloaded and used instantly as a ".json" file.
+3. PREVENT TRUNCATION (BE TOKEN-EFFICIENT WITH BREAKDOWNS):
+   - To ensure you can complete the entire transcript and provide comprehensive lesson-wide coverage without hitting Gemini output token limit thresholds (which causes truncated or half-finished responses):
+   - Keep the "breakdown" arrays highly selective! Only include breakdown translations for novel, difficult, idiom-based, or non-obvious words and grammar chunks in that sentence.
+   - Do NOT build massive breakdown arrays translating every single obvious word (like "I", "to", "the", etc.) in every sentence, as this creates bloated JSON and causes cutoffs.
+
+4. DELIVER THE COMPLETE LESSON COVERAGE:
+   - Provide a highly paced, comprehensive dataset that spans from the absolute beginning to the absolute end of the raw transcript.
+   - Do NOT stop halfway or omit later sections. The entire lesson curriculum must be captured.
+
+5. EXACT TIMESTAMP MAPPING & DURATION LOOPS:
+   - Estimate and map start and end timestamps extremely carefully:
+     - "id": a sequential integer starting from 1.
+     - "timestamp": The exact start time of the phrase in total seconds (e.g., 1:15 becomes 75).
+     - "timestampStr": The string timestamp (e.g. "1:15" or "0:45").
+     - "timestampEnd": Estimate the end timestamp of the phrase in total seconds. Look ahead to the subsequent segment's start timestamp. The current phrase's end time should finish right before the next phrase begins (usually 0.2 to 0.5 seconds before it, or when the spoken sentence naturally concludes), ensuring loops function seamlessly in the companion application.
+     - "timestampEndStr": The string timestamp for the calculated end of the phrase (e.g. "1:18" or "0:48").
+
+6. MANDATORY SINGLE CODE BLOCK FORMAT (FOR INSTANT DOWNLOAD BUTTON):
+   - You MUST wrap your entire output in a single markdown code block (using \`\`\`json and \`\`\`). This is crucial because it triggers the Google Gemini interface to render a direct, one-click "Download" or "Copy" button so the user can save the code as a local file.
+   - Do NOT include any conversational preamble, introduction, or post-match explanations. The ONLY text in your entire response must be the markdown block containing the valid, complete JSON object.
+   - Do NOT use placeholder ellipses (like "... [rest of phrases] ...") or truncate the JSON, as this makes the file completely unparseable for the user's application.
 
 JSON Schema structure:
 {
@@ -1676,6 +1868,7 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
   const ytPlayerInstanceRef = useRef<any>(null);
   const pendingSeekRef = useRef<number | null>(null);
+  const preventAutoPlayOnceRef = useRef<boolean>(false);
 
   // Load YouTube script on mount
   useEffect(() => {
@@ -1948,15 +2141,35 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
     }
   }, [cardIndex, filteredPhrases.length]);
 
+  const pauseMedia = () => {
+    if (mediaPlayerType === 'local' && videoPlayerRef.current) {
+      videoPlayerRef.current.pause();
+    } else if (mediaPlayerType === 'youtube' && ytPlayerInstanceRef.current && typeof ytPlayerInstanceRef.current.pauseVideo === 'function') {
+      try {
+        ytPlayerInstanceRef.current.pauseVideo();
+      } catch (e) {}
+    }
+  };
+
   // Dual Player Jump to Timestamp Handler
-  const playAtTimestamp = (seconds: number) => {
+  const playAtTimestamp = (seconds: number, shouldPlay: boolean = true) => {
     if (mediaPlayerType === 'local' && videoPlayerRef.current) {
       videoPlayerRef.current.currentTime = seconds;
-      videoPlayerRef.current.play().catch(e => console.log("Auto-play blocked or seeking complete.", e));
+      if (shouldPlay) {
+        videoPlayerRef.current.play().catch(e => console.log("Auto-play blocked or seeking complete.", e));
+      } else {
+        videoPlayerRef.current.pause();
+      }
     } else {
       if (ytPlayerInstanceRef.current && typeof ytPlayerInstanceRef.current.seekTo === 'function') {
         ytPlayerInstanceRef.current.seekTo(seconds, true);
-        ytPlayerInstanceRef.current.playVideo();
+        if (shouldPlay) {
+          ytPlayerInstanceRef.current.playVideo();
+        } else {
+          try {
+            ytPlayerInstanceRef.current.pauseVideo();
+          } catch (e) {}
+        }
       } else {
         pendingSeekRef.current = seconds;
         // For YouTube, update the start query parameter of the iframe.
@@ -2016,12 +2229,16 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
     if (activePhrase && (activeTab === 'flashcards' || activeTab === 'lyrics')) {
       if (lastPlayedIdRef.current !== activePhrase.id) {
         lastPlayedIdRef.current = activePhrase.id;
-        if (autoPlayOnCardChange) {
+        if (preventAutoPlayOnceRef.current) {
+          preventAutoPlayOnceRef.current = false;
+          // Seek to the new card but stay paused
+          playAtTimestamp(activePhrase.timestamp, false);
+        } else if (autoPlayOnCardChange) {
           if (isAutoProgressionRef.current) {
             // Reached naturally by playhead progression, consume flag without seeking
             isAutoProgressionRef.current = false;
           } else {
-            playAtTimestamp(activePhrase.timestamp);
+            playAtTimestamp(activePhrase.timestamp, true);
           }
         }
       }
@@ -2209,6 +2426,8 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
   };
 
   const handleRateCard = (id: number, rating: 'easy' | 'medium' | 'hard') => {
+    pauseMedia();
+    preventAutoPlayOnceRef.current = true;
     setKnownRates(prev => ({ ...prev, [id]: rating }));
     handleNextCard();
   };
@@ -2859,13 +3078,55 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
                         <span>Or Paste Transcript Manually</span>
                         <ChevronDown className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-180" />
                       </summary>
-                      <div className="p-3 border-t border-slate-850 space-y-2">
+                      <div className="p-3 border-t border-slate-850 space-y-2.5">
                         <textarea
                           placeholder="e.g.&#10;0:12 Hola amigos&#10;0:15 Bienvenidos a la lección de hoy..."
                           value={promptTranscript}
                           onChange={(e) => setPromptTranscript(e.target.value)}
                           className="w-full h-32 bg-slate-950 border border-slate-850 rounded-lg p-2.5 font-mono text-[11px] text-slate-300 focus:border-indigo-500 outline-none resize-none"
                         />
+                        {promptTranscript.trim() && (
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cleanedOfJunk = cleanTranscriptTextOfJunk(promptTranscript);
+                                const parsedSegments = parseTranscriptText(cleanedOfJunk);
+                                let finalFormatted = cleanedOfJunk;
+                                let formatChanged = false;
+                                if (parsedSegments.length > 0) {
+                                  finalFormatted = parsedSegments.map(seg => `${seg.timestampStr} ${seg.text}`).join('\n');
+                                  formatChanged = true;
+                                }
+                                const originalLinesCount = promptTranscript.split('\n').length;
+                                const newLinesCount = finalFormatted.split('\n').length;
+                                setPromptTranscript(finalFormatted);
+                                if (originalLinesCount > newLinesCount) {
+                                  const diff = originalLinesCount - newLinesCount;
+                                  setSuccessMessage(`Success! Removed ${diff} lines of junk, ads, and timecode noise. Transcript is now pristine!`);
+                                  setValidationSuccess(true);
+                                  setTimeout(() => setValidationSuccess(false), 5000);
+                                  setValidationError(null);
+                                } else if (formatChanged) {
+                                  setSuccessMessage("Success! Structured and cleaned all subtitle/timecode formatting noise.");
+                                  setValidationSuccess(true);
+                                  setTimeout(() => setValidationSuccess(false), 4000);
+                                  setValidationError(null);
+                                } else {
+                                  setSuccessMessage("Checked transcript! Already clean and well-formatted.");
+                                  setValidationSuccess(true);
+                                  setTimeout(() => setValidationSuccess(false), 3000);
+                                  setValidationError(null);
+                                }
+                              }}
+                              className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                              title="Strip trailing description sections, social links, merchandise, and Patreon promos"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                              <span>Trim Trailing Ads & Links</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </details>
 
