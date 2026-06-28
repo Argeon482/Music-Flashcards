@@ -6,7 +6,7 @@ import {
   AlertCircle, Headphones, Shuffle, Upload, Download, Film,
   Info, Sparkle, ExternalLink, CheckCircle2, Copy, Plus,
   Trash2, FolderHeart, Languages, Settings, Users, Cloud, CloudOff, CloudLightning,
-  Layers
+  Layers, Maximize2, Minimize2
 } from 'lucide-react';
 import { SONG_DATA } from './data';
 import { Phrase, PhraseBreakdown, VocabTerm, SongData } from './types';
@@ -1283,6 +1283,76 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     localStorage.setItem('confieso_auto_stop_after_phrase', autoStopAfterPhrase.toString());
   }, [autoStopAfterPhrase]);
 
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('confieso_fullscreen');
+      return saved !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('confieso_fullscreen', isFullscreen.toString());
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      // Keep state in sync with real browser fullscreen state if the user entered it nativeside
+      if (document.fullscreenElement) {
+        setIsFullscreen(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      try {
+        const docEl = document.documentElement as any;
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          await docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } catch (err) {
+        console.log("Browser fullscreen blocked or failed, toggling virtual widescreen mode:", err);
+        setIsFullscreen(prev => !prev);
+      }
+    } else {
+      try {
+        const docWithExit = document as any;
+        if (docWithExit.exitFullscreen) {
+          await docWithExit.exitFullscreen();
+        } else if (docWithExit.webkitExitFullscreen) {
+          await docWithExit.webkitExitFullscreen();
+        } else if (docWithExit.mozCancelFullScreen) {
+          await docWithExit.mozCancelFullScreen();
+        } else if (docWithExit.msExitFullscreen) {
+          await docWithExit.msExitFullscreen();
+        }
+        setIsFullscreen(false);
+      } catch (err) {
+        console.log("Failed to exit native fullscreen:", err);
+        setIsFullscreen(prev => !prev);
+      }
+    }
+  };
+
   // Media Player configuration (YouTube + Local File)
   const [localFileUrl, setLocalFileUrl] = useState<string>('');
   const [localFileName, setLocalFileName] = useState<string>('');
@@ -1952,7 +2022,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
       
       {/* HEADER SECTION */}
       <header className={`relative border-b border-slate-900 bg-[#020617]/85 px-4 sticky top-0 z-50 backdrop-blur-md transition-all duration-300 ${showHeaderDetails ? 'py-4' : 'py-2 sm:py-2.5'}`}>
-        <div className={`max-w-7xl mx-auto flex flex-col ${showHeaderDetails ? 'gap-4' : 'gap-0'} transition-all duration-300`}>
+        <div className={`${isFullscreen ? 'max-w-full px-4 lg:px-8' : 'max-w-7xl'} mx-auto flex flex-col ${showHeaderDetails ? 'gap-4' : 'gap-0'} transition-all duration-300`}>
           
           {/* TOP ROW: Title details & Navigation tabs */}
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 w-full">
@@ -2008,33 +2078,44 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               )}
             </AnimatePresence>
 
-            {/* MAIN TABS NAVIGATION */}
-            <nav className="flex gap-1 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
-              {[
-                { id: 'flashcards', label: t('flashcards'), icon: BookOpen },
-                { id: 'quiz', label: t('quiz'), icon: HelpCircle },
-                { id: 'dictation', label: t('dictation'), icon: Keyboard },
-                { id: 'vocab', label: t('vocab'), icon: Sparkle },
-                { id: 'lyrics', label: t('lyrics'), icon: Headphones },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`tab-btn-${tab.id}`}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${
-                      activeTab === tab.id
-                        ? 'bg-teal-500/20 text-white border border-teal-500/30 shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+            {/* MAIN TABS NAVIGATION WITH FULLSCREEN TOGGLE */}
+            <div className="flex items-center gap-2.5 w-full lg:w-auto max-w-full justify-between sm:justify-end">
+              <nav className="flex gap-1 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
+                {[
+                  { id: 'flashcards', label: t('flashcards'), icon: BookOpen },
+                  { id: 'quiz', label: t('quiz'), icon: HelpCircle },
+                  { id: 'dictation', label: t('dictation'), icon: Keyboard },
+                  { id: 'vocab', label: t('vocab'), icon: Sparkle },
+                  { id: 'lyrics', label: t('lyrics'), icon: Headphones },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      id={`tab-btn-${tab.id}`}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${
+                        activeTab === tab.id
+                          ? 'bg-teal-500/20 text-white border border-teal-500/30 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <button
+                id="fullscreen-toggle-btn"
+                onClick={toggleFullscreen}
+                className="bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-teal-500/30 p-2 rounded-xl text-slate-400 hover:text-teal-300 transition-all duration-200 cursor-pointer flex items-center justify-center h-[46px] w-[46px] flex-shrink-0"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4 text-teal-400" /> : <Maximize2 className="w-4 h-4 text-teal-400" />}
+              </button>
+            </div>
           </div>
 
           {/* BOTTOM ROW: Cooperative Language Swap Hub (Collapsible on scroll) */}
@@ -2128,7 +2209,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
             exit={{ height: 0, opacity: 0 }}
             className="bg-[#0b1329] border-b border-slate-850 overflow-hidden"
           >
-            <div className="max-w-7xl mx-auto p-5 space-y-6">
+            <div className={`${isFullscreen ? 'max-w-full px-5 lg:px-8' : 'max-w-7xl'} mx-auto p-5 space-y-6`}>
               {/* Panel Header */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-3">
                 <div>
@@ -2847,7 +2928,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
 
       {/* CORE GRID CONTENT LAYOUT */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className={`flex-1 ${isFullscreen ? 'max-w-full px-4 lg:px-8' : 'max-w-7xl'} w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6`}>
         
         {/* LEFT COMPANION ARENA (Interactive Study activities) */}
         <section className="lg:col-span-7 flex flex-col gap-6">
@@ -4111,7 +4192,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
       {/* FOOTER */}
       <footer className="border-t border-slate-900 py-4 text-center text-xs text-slate-500 bg-slate-950">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className={`${isFullscreen ? 'max-w-full px-4 lg:px-8' : 'max-w-7xl'} mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3`}>
           <p>© 2026 Confieso Study Suite. Built natively with React & Tailwind CSS.</p>
           <div className="flex gap-4">
             <span className="hover:text-slate-400 cursor-help" title="Study app designed for language learning through immersive music connection.">About App</span>
