@@ -6,7 +6,7 @@ import {
   AlertCircle, Headphones, Shuffle, Upload, Download, Film,
   Info, Sparkle, ExternalLink, CheckCircle2, Copy, Plus,
   Trash2, FolderHeart, Languages, Settings, Users, Cloud, CloudOff, CloudLightning,
-  Layers, Maximize2, Minimize2
+  Layers, Maximize2, Minimize2, ChevronDown, Sparkles
 } from 'lucide-react';
 import { SONG_DATA } from './data';
 import { Phrase, PhraseBreakdown, VocabTerm, SongData } from './types';
@@ -1347,31 +1347,15 @@ export default function App() {
             
             const formatted = fallbackSegments.map(seg => `${seg.timestampStr} ${seg.text}`).join('\n');
             setPromptTranscript(formatted);
-            setSelectedPromptType('transcript');
             
-            // Also generate draft song json
-            const draftPhrases = fallbackSegments.map((seg, idx) => ({
-              id: idx + 1,
-              spanish: seg.text,
-              english: `[English translation for: ${seg.text}]`,
-              literal: `[Word-for-word translation for: ${seg.text}]`,
-              category: "Section 1",
-              timestamp: seg.timestamp,
-              timestampStr: seg.timestampStr,
-              breakdown: [{ word: "word", meaning: "meaning" }]
-            }));
-            
-            const draftSong = {
-              title: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "),
-              artist: "Speaker",
-              youtubeId: "YOUTUBE_ID",
-              phrases: draftPhrases,
-              vocab: [{ word: "word", definition: "meaning", example: "example" }]
-            };
-            
-            setSongInputJson(JSON.stringify(draftSong, null, 2));
+            const cleanName = file.name
+              .replace(/\.[^/.]+$/, "") // strip extension
+              .replace(/[-_]/g, " ") // replace dashes/underscores with spaces
+              .replace(/\b\w/g, c => c.toUpperCase()); // title case
+            setPromptSongName(cleanName + " by Speaker");
+
             setValidationError(null);
-            setSuccessMessage(`Successfully parsed ${fallbackSegments.length} text lines from ${file.name}! Switch to the "Transcript-Guided (New)" prompt tab to copy the translation prompt.`);
+            setSuccessMessage(`Successfully uploaded and parsed ${fallbackSegments.length} text lines from transcript file: "${file.name}".`);
             setValidationSuccess(true);
             setTimeout(() => setValidationSuccess(false), 5000);
             return;
@@ -1383,7 +1367,6 @@ export default function App() {
         
         const formatted = segments.map(seg => `${seg.timestampStr} ${seg.text}`).join('\n');
         setPromptTranscript(formatted);
-        setSelectedPromptType('transcript');
         
         // Populate the metadata title based on the filename
         const cleanName = file.name
@@ -1393,41 +1376,37 @@ export default function App() {
           
         setPromptSongName(cleanName + " by Speaker");
         
-        // Also pre-populate the JSON text area with a working draft containing all correct timestamps!
-        const draftPhrases = segments.map((seg, index) => ({
-          id: index + 1,
-          spanish: seg.text,
-          english: `[English translation for: ${seg.text}]`,
-          literal: `[Word-for-word translation for: ${seg.text}]`,
-          category: "Section",
-          timestamp: seg.timestamp,
-          timestampStr: seg.timestampStr,
-          breakdown: [
-            { word: "word", meaning: "meaning" }
-          ]
-        }));
-        
-        const draftSong = {
-          title: cleanName,
-          artist: "Speaker",
-          youtubeId: "YOUTUBE_ID",
-          phrases: draftPhrases,
-          vocab: [
-            {
-              word: "word",
-              definition: "meaning",
-              example: "example sentence"
-            }
-          ]
-        };
-        
-        setSongInputJson(JSON.stringify(draftSong, null, 2));
         setValidationError(null);
-        setSuccessMessage(`Successfully parsed ${segments.length} segments with timestamps from ${file.name}! Switch to the "Transcript-Guided (New)" prompt tab to copy the translation prompt.`);
+        setSuccessMessage(`Successfully uploaded and parsed ${segments.length} timestamped lines from transcript file: "${file.name}".`);
         setValidationSuccess(true);
         setTimeout(() => setValidationSuccess(false), 5000);
       } catch (err: any) {
         setValidationError(`Failed to parse transcript file: ${err.message}`);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleGeminiJsonUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const rawContent = event.target?.result as string;
+        const parsed = extractAndCleanJSON(rawContent);
+        const err = validateSongData(parsed);
+        if (err) {
+          setValidationError(`JSON file validation failed: ${err}`);
+          return;
+        }
+        const cleanedParsed = sanitizeAndSortSongData(parsed, false);
+        setSongData(cleanedParsed);
+        localStorage.setItem('confieso_custom_song', JSON.stringify(cleanedParsed));
+        setValidationError(null);
+        setSuccessMessage(`Success! Loaded customized lesson companion: "${cleanedParsed.title}" with ${cleanedParsed.phrases.length} phrases.`);
+        setValidationSuccess(true);
+        setTimeout(() => setValidationSuccess(false), 5000);
+      } catch (err: any) {
+        setValidationError(`Failed to load JSON file: ${err.message}`);
       }
     };
     reader.readAsText(file, "UTF-8");
@@ -1448,10 +1427,7 @@ export default function App() {
 
   // Dynamic next-pass/resume prompt for Gemini to continue translating incrementally
   const activePromptText = useMemo(() => {
-    const targetSongName = promptSongName.trim() || `${songData.title} by ${songData.artist}`;
-    
-    // Extract youtube ID from URL if user pastes a full link
-    let targetYoutubeId = promptYoutubeId.trim() || songData.youtubeId;
+    let targetYoutubeId = promptYoutubeId.trim() || songData.youtubeId || 'YOUTUBE_ID';
     if (targetYoutubeId.includes('youtube.com') || targetYoutubeId.includes('youtu.be')) {
       try {
         const urlObj = new URL(targetYoutubeId);
@@ -1463,138 +1439,77 @@ export default function App() {
       } catch (e) {}
     }
 
-    if (selectedPromptType === 'transcript') {
-      return `You will be provided with a raw YouTube transcript of a video (with timestamps).
-Your task is to convert this transcript into the complete bilingual study companion JSON dataset.
+    const cleanTitle = (promptSongName || songData.title || "Custom Lesson").split(' by ')[0] || "Custom Lesson";
+    const cleanSpeaker = (promptSongName || songData.artist || "Speaker").split(' by ')[1] || "Speaker";
 
-CRITICAL INSTRUCTIONS FOR SYSTEMATIC LEARNING:
-1. Use the provided transcript's timestamps, ${promptTargetLangA} spelling, and phrase order EXACTLY.
-2. For EVERY single line/phrase in the transcript, translate it and create a phrase card. Do NOT skip, summarize, or group lines. We want a complete and total translation of every phrase.
-3. For each phrase, provide BOTH the start and end timestamps. Use exact transcript times if available, or estimate them; the end time should be when that phrase finishes, usually 2-5 seconds after the start time or right before the next phrase starts.
-4. For each phrase, provide:
-   - "spanish": The original line (from the transcript, in ${promptTargetLangA}). Note: we keep the JSON key as "spanish" for application compatibility.
-   - "english": A natural, high-quality ${promptNativeLangA} translation. Note: we keep the JSON key as "english" for application compatibility.
-   - "literal": A literal word-for-word translation.
-   - "category": The video section/category (e.g., Intro, Part 1, Part 2, Topic A).
-   - "timestamp": The start time in total seconds (parsed from the transcript timestamp, e.g., 1:24 = 84).
-   - "timestampStr": The string timestamp format (e.g. "1:24" or "0:08").
-   - "timestampEnd": The end time in total seconds (estimated or exact, e.g., 1:27 = 87).
-   - "timestampEndStr": The string timestamp format for the end of the phrase (e.g., "1:27").
-   - "breakdown": In the "breakdown" array of EACH phrase, you MUST provide a complete, exhaustive translation of every key word, verb, and phrase block in that specific phrase. Break down virtually every word in the phrase so the learner has absolute clarity on how the phrase is built, rather than just 1 or 2 words.
-5. Extract an exhaustive vocabulary list capturing all unique verbs (in base form), nouns, slang, and expressions across the entire video and list them in the "vocab" array, complete with clear definitions and contextual examples so the user can learn the entirety of the video content.
-6. Output EXACTLY a single raw JSON object. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
+    return `You are a professional language learning content engineer. Your task is to process the raw video transcript of any speech, dialogue, dialogue-heavy lesson, conversation, or song below and compile a high-fidelity bilingual study companion dataset in JSON format.
 
-Here is the exact schema structure required (do NOT change the keys "spanish" or "english"):
+CRITICAL INSTRUCTIONS:
+1. Translate EVERY SINGLE phrase, spoken sentence, or lyrical line from the transcript sequentially. Do NOT skip any lines, do NOT summarize, and do NOT group lines. We require complete phrase-by-phrase coverage of the entire video.
+2. Determine and estimate timestamps extremely carefully so the interactive media playback and loop feature is pristine:
+   - "id": a sequential integer starting from 1.
+   - "spanish": The original line from the transcript in its exact original spelling (Target Language: ${promptTargetLangA}).
+     *CRITICAL NOTE FOR PARSING COMPATIBILITY*: You MUST keep the JSON key name as "spanish", even if the target language is ${promptTargetLangA}!
+   - "english": A natural, high-quality, readable translation in the native/translation language (Native Language: ${promptNativeLangA}).
+     *CRITICAL NOTE FOR PARSING COMPATIBILITY*: You MUST keep the JSON key name as "english", even if the native language is ${promptNativeLangA}!
+   - "literal": A literal, word-for-word translation showing exact alignment of grammar structures.
+   - "category": The topic, chapter, or section of the lesson (e.g. "Intro", "Part 1", "Main Lesson", "Outro").
+   - "timestamp": The exact start time of the phrase in total seconds (e.g., 1:15 becomes 75).
+   - "timestampStr": The string timestamp (e.g. "1:15" or "0:45").
+   - "timestampEnd": Precisely figure out and estimate the end timestamp of each phrase in total seconds. Do NOT blindly add a static 3 seconds. Look ahead to the subsequent line's start timestamp. The current phrase's end time should end right before the next phrase begins (usually 0.2 to 0.5 seconds before it, or when the spoken line naturally finishes), ensuring the application has clean, accurate start and end points for looped repetitions.
+   - "timestampEndStr": The string timestamp for the calculated end of the phrase (e.g. "1:18" or "0:48").
+   - "breakdown": An array of detailed word-by-word or chunk-by-chunk translation blocks for that phrase:
+     [ { "word": "Target Language word/chunk", "meaning": "Native Language translation" } ]
+     Include breakdowns for virtually every single word in the phrase so that nothing is left unexplained.
+
+3. Extract a comprehensive vocabulary list from the video transcript and place it in the "vocab" array:
+   - "word": The key verb (in base form), noun, adjective, slang, or grammar point from the lesson.
+   - "definition": A clear definition in ${promptNativeLangA}.
+   - "example": An example sentence demonstrating context, ideally inspired by or taken from the transcript.
+
+CRITICAL FORMAT & DOWNLOAD REQUIREMENT:
+You MUST wrap your entire output in a single markdown code block (using \`\`\`json and \`\`\`) so that the Google Gemini user interface automatically renders the code block and provides a direct, one-click "Download" or "Copy" button to save it as a file.
+- Do NOT include any conversational preamble, introduction, or post-match explanations. The only text in your response must be the markdown block containing the valid JSON object.
+- Ensure the JSON is properly formatted and valid so it can be downloaded and used instantly as a ".json" file.
+
+JSON Schema structure:
 {
-  "title": "${targetSongName.split(' by ')[0] || targetSongName}",
-  "artist": "${targetSongName.split(' by ')[1] || 'Speaker'}",
+  "title": "${cleanTitle}",
+  "artist": "${cleanSpeaker}",
   "youtubeId": "${targetYoutubeId}",
   "phrases": [
     {
       "id": 1,
-      "spanish": "original text line in ${promptTargetLangA}",
-      "english": "Natural ${promptNativeLangA} translation",
-      "literal": "Literal translation",
-      "category": "Topic Name",
+      "spanish": "original target language text line",
+      "english": "natural translation",
+      "literal": "literal translation",
+      "category": "Topic Section Name",
       "timestamp": 12,
       "timestampStr": "0:12",
-      "timestampEnd": 15.5,
-      "timestampEndStr": "0:15.5",
+      "timestampEnd": 15,
+      "timestampEndStr": "0:15",
       "breakdown": [
         { "word": "word", "meaning": "translation" }
       ]
     }
   ],
   "vocab": [
-    { "word": "word", "definition": "definition", "example": "sentence from transcript" }
+    { "word": "vocab word", "definition": "clear definition", "example": "example sentence" }
   ]
 }
 
-Here is the raw YouTube transcript to process:
-${promptTranscript.trim() || "(Please paste or upload your raw transcript in the input fields above to automatically include it here!)"}`;
-    }
+---
+VIDEO METADATA INFORMATION:
+- Lesson Title: ${cleanTitle}
+- Speaker/Artist: ${cleanSpeaker}
+- YouTube Video ID: ${targetYoutubeId}
+- Target Language (spelling): ${promptTargetLangA}
+- Native/Translation Language: ${promptNativeLangA}
 
-    if (selectedPromptType === 'resume') {
-      const lastPhrase = songData.phrases[songData.phrases.length - 1];
-      const lastPhraseInfo = lastPhrase ? {
-        id: lastPhrase.id,
-        spanish: lastPhrase.spanish,
-        english: lastPhrase.english,
-        timestampStr: lastPhrase.timestampStr,
-        timestamp: lastPhrase.timestamp,
-        timestampEndStr: lastPhrase.timestampEndStr,
-        timestampEnd: lastPhrase.timestampEnd,
-        category: lastPhrase.category
-      } : null;
-
-      return `We are compiling structured bilingual learning companion data for "${songData.title}" by "${songData.artist}" (Video ID: "${targetYoutubeId}").
-Because the transcript is very long, we are doing this incrementally in multiple rounds.
-
-We have already completed ${songData.phrases.length} phrases. Here is the last translated phrase of our current save state:
-${lastPhraseInfo ? JSON.stringify(lastPhraseInfo, null, 2) : "None yet. This is the start of the video."}
-
-Please continue translating the transcript. Specifically, you MUST translate phrases ${startPhraseNum} to ${endPhraseNum} of the transcript.
-Do NOT repeat any of the previously completed lines. Translate starting immediately after the previously translated line: "${lastPhrase ? lastPhrase.spanish : "(Start of transcript)"}".
-
-Provide start and end timestamps (estimate the end timestamp to be when the phrase ends, usually 2-5 seconds after start), natural ${promptNativeLangA} translations, literal word-for-word translations, complete breakdowns (exhaustive word-by-word and chunk-by-chunk breakdowns for virtually all words in each phrase so that no word is left unexplained), and an exhaustive vocabulary list (add to the "vocab" array) capturing all unique verbs, nouns, and slang across these lines.
-
-Format the response EXACTLY as a single raw JSON object matching the schema below. Do NOT wrap it in markdown codeblocks (no \`\`\`json).
-Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}. Keep the JSON keys "spanish" and "english" for front-end compatibility:
-
-{
-  "phrases": [
-    {
-      "id": ${startPhraseNum},
-      "spanish": "${promptTargetLangA} lyric for phrase ${startPhraseNum}",
-      "english": "Natural ${promptNativeLangA} translation",
-      "literal": "Literal word-for-word translation",
-      "category": "Song section (e.g., Verse 2, Chorus, Outro)",
-      "timestamp": ${lastPhrase ? lastPhrase.timestamp + 4 : 0},
-      "timestampStr": "MM:SS",
-      "timestampEnd": ${lastPhrase ? lastPhrase.timestamp + 7 : 3},
-      "timestampEndStr": "MM:SS",
-      "breakdown": [
-        { "word": "word", "meaning": "translation" }
-      ]
-    }
-  ],
-  "vocab": [
-    { "word": "Key vocab word", "definition": "${promptNativeLangA} definition", "example": "Sentence from song showing usage" }
-  ]
-}`;
-    }
-
-    // Replace the placeholders in pre-configured prompts with dynamic values entered by the user
-    const baseTemplate = PROMPT_TEMPLATES[selectedPromptType as 'flash' | 'detailed' | 'parts'];
-    let customTemplate = baseTemplate.replace(/\[INSERT SONG NAME AND ARTIST HERE\]/g, targetSongName);
-    
-    // Also inject youtube ID if specified
-    customTemplate = customTemplate.replace(/"youtubeId": "[^"]*"/, `"youtubeId": "${targetYoutubeId}"`);
-
-    // Dynamically update languages in the template while preserving key names
-    customTemplate = customTemplate
-      .replace(/English translation/gi, `${promptNativeLangA} translation`)
-      .replace(/English translations/gi, `${promptNativeLangA} translations`)
-      .replace(/English definition/gi, `${promptNativeLangA} definition`)
-      .replace(/Spanish phrase/gi, `${promptTargetLangA} phrase`)
-      .replace(/Spanish spelling/gi, `${promptTargetLangA} spelling`)
-      .replace(/Spanish word/gi, `${promptTargetLangA} word`)
-      .replace(/Spanish words/gi, `${promptTargetLangA} words`)
-      .replace(/Full Spanish/gi, `Full ${promptTargetLangA}`);
-
-    // Add note on keys
-    customTemplate += `\n\nCRITICAL CONSTRAINTS FOR COMPATIBILITY:
-- Note that the target language (song lyrics) is: ${promptTargetLangA}
-- Note that the native language (translation) is: ${promptNativeLangA}
-- The JSON keys MUST remain EXACTLY "spanish" (for ${promptTargetLangA}) and "english" (for ${promptNativeLangA}) in the output object. Do NOT rename these keys to other language names.`;
-
-    // If a transcript is pasted but we are using another template, append it optionally
-    if (promptTranscript.trim() && selectedPromptType !== 'resume') {
-      customTemplate += `\n\nReference YouTube Transcript:\n${promptTranscript.trim()}`;
-    }
-
-    return customTemplate;
-  }, [selectedPromptType, songData, startPhraseNum, endPhraseNum, promptSongName, promptYoutubeId, promptTranscript, promptTargetLangA, promptNativeLangA, promptTargetLangB, promptNativeLangB]);
+---
+RAW VIDEO TRANSCRIPT TO PROCESS:
+${promptTranscript.trim() || "(Please upload a transcript file above or type/paste your transcript here to include it in the download prompt!)"}`;
+  }, [promptSongName, songData, promptYoutubeId, promptTargetLangA, promptNativeLangA, promptTranscript]);
 
   // Flashcard states
   const [cardIndex, setCardIndex] = useState<number>(() => {
@@ -2651,7 +2566,16 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
             exit={{ height: 0, opacity: 0 }}
             className="bg-[#0b1329] border-b border-slate-850 overflow-hidden"
           >
-            <div className={`${isFullscreen ? 'max-w-full px-5 lg:px-8' : 'max-w-7xl'} mx-auto p-5 space-y-6`}>
+            <div className={`${isFullscreen ? 'max-w-full px-5 lg:px-8' : 'max-w-7xl'} mx-auto p-5 space-y-6 relative`}>
+              {/* Close Button */}
+              <button
+                onClick={() => setShowSongManager(false)}
+                className="absolute top-5 right-5 p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all flex items-center justify-center cursor-pointer shadow-md z-10"
+                title="Close Customizer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
               {/* Panel Header */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-3">
                 <div>
@@ -2662,7 +2586,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                     Turn this application into an immersive study companion for any video lesson in the world. Just fetch lesson metadata from Gemini and load it below!
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 sm:pr-12">
                   <button
                     id="reset-song-btn"
                     onClick={() => {
@@ -2812,333 +2736,417 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               </div>
 
               {/* Grid content */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Left Side: Copilot Prompter */}
-                <div className="lg:col-span-5 space-y-4">
-                  <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850 space-y-3.5">
-                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
-                      <span className="text-xs font-bold text-indigo-300 tracking-wide uppercase flex items-center gap-1.5">
-                        <Sparkle className="w-4 h-4 text-indigo-400 animate-pulse" /> Gemini AI Prompt Copilot
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          id="copy-prompt-btn"
-                          onClick={() => {
-                            try {
-                              navigator.clipboard.writeText(activePromptText).catch(() => {
-                                // Ignore or handle silent fail
-                              });
-                            } catch (e) {
-                              // Ignore or handle silent fail
-                            }
-                            setCopiedPrompt(true);
-                            setTimeout(() => setCopiedPrompt(false), 2000);
-                          }}
-                          className={`text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                            copiedPrompt 
-                              ? 'bg-emerald-500 text-slate-950' 
-                              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
-                          }`}
-                        >
-                          {copiedPrompt ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedPrompt ? 'Copied!' : 'Copy'}</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            const element = document.createElement("a");
-                            const file = new Blob([activePromptText], {type: 'text/plain;charset=utf-8'});
-                            element.href = URL.createObjectURL(file);
-                            const cleanName = (promptSongName || songData.title || "video").toLowerCase().replace(/[^a-z0-9]+/g, '_');
-                            element.download = `${cleanName}_gemini_prompt.txt`;
-                            document.body.appendChild(element);
-                            element.click();
-                            document.body.removeChild(element);
-                          }}
-                          className="bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/30 text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer"
-                          title="Download prompt as a .txt file to upload or drag into Gemini"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Download Prompt File</span>
-                        </button>
+                {/* Column 1: Step 1 & Step 2 (Inputs & Transcript) */}
+                <div className="space-y-6">
+                  
+                  {/* Step 1: Set Lesson & Language Details */}
+                  <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-850 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-xs text-indigo-400">1</div>
+                      <h3 className="text-sm font-bold text-slate-200">Set Lesson & Language Details</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1">Target Language:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Spanish"
+                          value={promptTargetLangA}
+                          onChange={(e) => setPromptTargetLangA(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none"
+                        />
                       </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1">Native Language:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. English"
+                          value={promptNativeLangA}
+                          onChange={(e) => setPromptNativeLangA(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-1">YouTube Link or Video ID:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. https://www.youtube.com/watch?v=kRt2sRyup6A"
+                        value={promptYoutubeId}
+                        onChange={(e) => setPromptYoutubeId(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none placeholder:text-slate-600"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1">Lesson Title (Optional):</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. La Camisa Negra"
+                          value={promptSongName.split(' by ')[0] || ''}
+                          onChange={(e) => {
+                            const speaker = promptSongName.split(' by ')[1] || 'Speaker';
+                            setPromptSongName(e.target.value + ' by ' + speaker);
+                          }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none placeholder:text-slate-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold block mb-1">Speaker / Artist (Optional):</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Juanes"
+                          value={promptSongName.split(' by ')[1] || ''}
+                          onChange={(e) => {
+                            const title = promptSongName.split(' by ')[0] || 'Custom Lesson';
+                            setPromptSongName(title + ' by ' + e.target.value);
+                          }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 outline-none placeholder:text-slate-600"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Upload Transcript File */}
+                  <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-850 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-xs text-indigo-400">2</div>
+                        <h3 className="text-sm font-bold text-slate-200">Provide Raw Video Transcript</h3>
+                      </div>
+                      <span className="text-[10px] font-mono text-teal-400/80 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">Supports Timestamps</span>
                     </div>
 
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Choose a fine-tuned prompter model to prevent truncation on smaller models (like Gemini Flash/Lite), copy the prompt, and run it on Gemini.
+                      Upload your transcript file. If your file contains raw timestamps (e.g. 0:12, [0:15]), they will be automatically extracted to keep the interactive seeking features intact.
                     </p>
 
-                    {/* Prompt Selection Tabs */}
-                    <div className="flex flex-wrap bg-slate-900/60 p-1 rounded-xl border border-slate-800 gap-1">
-                      {[
-                        { id: 'flash', label: 'Flash/Lite Optimized', desc: 'Truncation prevention' },
-                        { id: 'detailed', label: 'Detailed (Pro)', desc: 'Max details' },
-                        { id: 'transcript', label: 'Transcript-Guided (New)', desc: 'Use raw YouTube transcript with timestamps' },
-                        { id: 'parts', label: 'Part 1 (Long Song)', desc: 'Generate first half' },
-                        { id: 'resume', label: 'Incremental Pass (Resume)', desc: 'Generate next chunk based on last card' }
-                      ].map(type => (
-                        <button
-                          key={type.id}
-                          type="button"
-                          onClick={() => setSelectedPromptType(type.id as any)}
-                          title={type.desc}
-                          className={`flex-1 min-w-[110px] text-[10px] sm:text-xs py-1.5 px-2 rounded-lg font-bold transition-all ${
-                            selectedPromptType === type.id
-                              ? 'bg-indigo-600 text-white shadow-md'
-                              : 'text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
+                    {/* Drag & Drop File Area */}
+                    <label 
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          handleTranscriptFileUpload(e.dataTransfer.files[0]);
+                        }
+                      }}
+                      className="group flex flex-col items-center justify-center border-2 border-dashed border-slate-800 hover:border-indigo-500 bg-slate-950/40 hover:bg-slate-900/10 p-5 rounded-2xl transition cursor-pointer text-center"
+                    >
+                      <Upload className="w-6 h-6 text-slate-500 group-hover:text-indigo-400 transition mb-2" />
+                      <p className="text-xs font-bold text-slate-300 group-hover:text-slate-200">Drag & Drop Transcript File Here</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Accepts .html, .txt, .srt, .bin</p>
+                      <span className="text-[9px] text-indigo-400/80 underline decoration-dotted mt-2 group-hover:text-indigo-300">or browse computer files</span>
+                      <input
+                        type="file"
+                        accept=".html,.htm,.txt,.srt,.bin"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleTranscriptFileUpload(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
 
-                    {/* Metadata & Transcript inputs */}
-                    <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-850/60 space-y-3">
-                      <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
-                        <Sparkle className="w-3.5 h-3.5" /> Prompt Customizer Inputs
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-1">Lesson Topic & Speaker:</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Conversational Spanish Lesson by Instructor"
-                            value={promptSongName}
-                            onChange={(e) => setPromptSongName(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 focus:border-indigo-500 outline-none placeholder:text-slate-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-1">YouTube Link or ID:</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. kRt2sRyup6A"
-                            value={promptYoutubeId}
-                            onChange={(e) => setPromptYoutubeId(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 focus:border-indigo-500 outline-none placeholder:text-slate-600"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Learner Languages selection row */}
-                      <div className="pt-2 border-t border-slate-800/50">
-                        {/* Study Languages */}
-                        <div className="bg-slate-950/40 p-2.5 rounded-xl border border-slate-900 space-y-2">
-                          <span className="text-[10px] font-bold text-teal-400 block uppercase tracking-wider">Study Languages Configuration</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[9px] text-slate-500 block mb-0.5">Target Language (e.g. Spanish):</label>
-                              <input
-                                type="text"
-                                value={promptTargetLangA}
-                                onChange={(e) => setPromptTargetLangA(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-200 focus:border-teal-500 outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[9px] text-slate-500 block mb-0.5">Translation Language (e.g. English):</label>
-                              <input
-                                type="text"
-                                value={promptNativeLangA}
-                                onChange={(e) => setPromptNativeLangA(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-200 focus:border-teal-500 outline-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-[10px] text-slate-400 block">Paste YouTube Transcript (with Timestamps):</label>
-                          {selectedPromptType === 'transcript' && (
-                            <span className="text-[9px] text-teal-400 font-bold animate-pulse">Required for Transcript-Guided tab</span>
-                          )}
-                        </div>
+                    {/* Collapsible Textarea for manual copy paste */}
+                    <details className="group border border-slate-850 rounded-xl overflow-hidden bg-slate-900/20">
+                      <summary className="flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-300 cursor-pointer select-none transition">
+                        <span>Or Paste Transcript Manually</span>
+                        <ChevronDown className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="p-3 border-t border-slate-850 space-y-2">
                         <textarea
-                          placeholder="e.g.&#10;0:01 [Music]&#10;0:12 Tengo la camisa negra&#10;0:16 Hoy mi amor está de luto"
+                          placeholder="e.g.&#10;0:12 Hola amigos&#10;0:15 Bienvenidos a la lección de hoy..."
                           value={promptTranscript}
                           onChange={(e) => setPromptTranscript(e.target.value)}
-                          className="w-full h-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-slate-300 focus:border-indigo-500 outline-none placeholder:text-slate-600 resize-none"
+                          className="w-full h-32 bg-slate-950 border border-slate-850 rounded-lg p-2.5 font-mono text-[11px] text-slate-300 focus:border-indigo-500 outline-none resize-none"
                         />
-                        
-                        {/* Drag and Drop / Click Transcript File Uploader */}
-                        <div className="mt-2 flex flex-col gap-1.5">
-                          <div className="flex justify-between items-center text-[9px] text-slate-500">
-                            <span>Or import downloaded transcript file:</span>
-                            <span className="font-mono text-teal-500">Supports .html, .txt, .srt, .bin</span>
-                          </div>
-                          
-                          <label 
-                            onDragOver={(e) => { e.preventDefault(); }}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                handleTranscriptFileUpload(e.dataTransfer.files[0]);
-                              }
-                            }}
-                            className="group flex flex-col items-center justify-center border border-dashed border-slate-800 hover:border-indigo-500/60 bg-slate-950/40 hover:bg-slate-900/30 p-2.5 rounded-xl transition cursor-pointer text-center"
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <Upload className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400 transition" />
-                              <span className="text-[10px] font-medium text-slate-400 group-hover:text-slate-200 transition">
-                                Click or drag & drop HTML / Text / Bin transcript file
-                              </span>
-                            </div>
-                            <input
-                              type="file"
-                              accept=".html,.htm,.txt,.srt,.bin"
-                              className="hidden"
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  handleTranscriptFileUpload(e.target.files[0]);
-                                }
-                              }}
-                            />
-                          </label>
-                        </div>
                       </div>
-                    </div>
+                    </details>
 
-                    {selectedPromptType === 'resume' && (
-                      <div className="bg-slate-900/45 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
-                        <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Incremental Configuration:</div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-slate-400 block mb-1">Start lyric index:</label>
-                            <input
-                              type="number"
-                              min="1"
-                              placeholder={`Auto (${songData.phrases.length + 1})`}
-                              value={customResumeStart}
-                              onChange={(e) => setCustomResumeStart(e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:border-indigo-500 outline-none"
-                            />
-                            <span className="text-[9px] text-slate-500 mt-1 block">Default: {songData.phrases.length + 1}</span>
-                          </div>
-                          <div>
-                            <label className="text-slate-400 block mb-1">Phrase count per pass:</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={resumeChunkSize}
-                              onChange={(e) => setResumeChunkSize(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:border-indigo-500 outline-none"
-                            />
-                            <span className="text-[9px] text-slate-500 mt-1 block">Request {resumeChunkSize} lyrics next</span>
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-teal-400 font-medium">
-                          Will request lyrics #{startPhraseNum} to #{endPhraseNum} sequentially.
-                        </div>
+                    {promptTranscript.trim() && (
+                      <div className="bg-teal-950/20 border border-teal-900/40 p-2.5 rounded-xl text-[11px] text-teal-300 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />
+                        <span>Transcript Loaded! Ready to generate prompt file. ({promptTranscript.split('\n').length} lines)</span>
                       </div>
                     )}
-
-                    <div className="bg-black/40 p-3 rounded-xl border border-slate-900 font-mono text-[10px] text-slate-400 max-h-[160px] overflow-y-auto whitespace-pre-wrap select-all">
-                      {activePromptText}
-                    </div>
-                  </div>
-
-                  {/* Current Active Metadata summary card */}
-                  <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850/60 space-y-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Lesson Metadata:</span>
-                    <div className="grid grid-cols-2 gap-4 text-xs pt-1">
-                      <div>
-                        <span className="text-slate-500 block">Lesson Title</span>
-                        <strong className="text-slate-200">{songData.title}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Speaker / Instructor</span>
-                        <strong className="text-slate-200">{songData.artist}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Study Phrases</span>
-                        <strong className="text-teal-400">{songData.phrases.length} cards</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Vocab Count</span>
-                        <strong className="text-indigo-400">{songData.vocab?.length || 0} terms</strong>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                {/* Right Side: Paste Zone */}
-                <div className="lg:col-span-7 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-300">Paste Gemini's JSON Output:</label>
-                    <span className="text-[10px] text-slate-500 font-mono">Format: JSON Object</span>
-                  </div>
-
-                  <textarea
-                    id="song-json-textarea"
-                    value={songInputJson}
-                    onChange={(e) => {
-                      setSongInputJson(e.target.value);
-                      setValidationError(null);
-                    }}
-                    placeholder={`{
-  "title": "La Camisa Negra",
-  "artist": "Juanes",
-  ...
-}`}
-                    className="w-full h-[220px] bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs text-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
-                  />
-
-                  {validationError && (
-                    <div className="bg-rose-950/40 border border-rose-900/40 p-3 rounded-xl text-xs text-rose-300 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{validationError}</span>
+                {/* Column 2: Step 3 & Step 4 (Prompt download & Gemini upload) */}
+                <div className="space-y-6">
+                  
+                  {/* Step 3: Get Gemini Prompt File */}
+                  <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-850 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-xs text-indigo-400">3</div>
+                        <h3 className="text-sm font-bold text-slate-200">Download Gemini Prompt File</h3>
+                      </div>
+                      <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
                     </div>
-                  )}
 
-                  {validationSuccess && (
-                    <div className="bg-emerald-950/40 border border-emerald-900/40 p-3 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{successMessage || `Song Loaded Successfully! The app has rebuilt study decks for "${songData.title}".`}</span>
-                    </div>
-                  )}
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Download this custom structured prompt file. It is configured to direct Gemini to translate and process your transcript line-by-line, generate vocabulary lists, and return a clean, fully-formed JSON file.
+                    </p>
 
-                  <div className="flex flex-wrap justify-between items-center gap-3 pt-2 border-t border-slate-900">
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <button
-                        type="button"
                         onClick={() => {
-                          try {
-                            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(songData, null, 2));
-                            const downloadAnchor = document.createElement('a');
-                            downloadAnchor.setAttribute("href", dataStr);
-                            downloadAnchor.setAttribute("download", `${songData.title.toLowerCase().replace(/\s+/g, '_')}_companion.json`);
-                            document.body.appendChild(downloadAnchor);
-                            downloadAnchor.click();
-                            downloadAnchor.remove();
-                          } catch (e: any) {
-                            setValidationError(`Failed to export song backup: ${e.message}`);
-                          }
+                          const element = document.createElement("a");
+                          const file = new Blob([activePromptText], {type: 'text/plain;charset=utf-8'});
+                          element.href = URL.createObjectURL(file);
+                          const cleanName = (promptSongName || songData.title || "lesson").toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                          element.download = `${cleanName}_gemini_prompt.txt`;
+                          document.body.appendChild(element);
+                          element.click();
+                          document.body.removeChild(element);
                         }}
-                        className="bg-slate-900 hover:bg-slate-850 text-slate-300 font-semibold text-[10px] sm:text-xs px-3 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer border border-slate-800"
-                        title="Download a full backup of this custom song setup as a .json file"
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/15 cursor-pointer"
+                        title="Download prompter file"
                       >
-                        <Download className="w-3.5 h-3.5 text-teal-400" /> Export JSON Backup
+                        <Download className="w-4 h-4" />
+                        <span>Download Prompt File</span>
                       </button>
 
-                      <label className="bg-slate-900 hover:bg-slate-850 text-slate-300 font-semibold text-[10px] sm:text-xs px-3 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer border border-slate-800" title="Upload an exported .json song companion file">
-                        <Upload className="w-3.5 h-3.5 text-indigo-400" /> Import JSON Backup
-                        <input
-                          type="file"
-                          accept=".json"
-                          className="hidden"
+                      <button
+                        id="copy-prompt-btn"
+                        onClick={() => {
+                          try {
+                            navigator.clipboard.writeText(activePromptText).catch(() => {});
+                          } catch (e) {}
+                          setCopiedPrompt(true);
+                          setTimeout(() => setCopiedPrompt(false), 2000);
+                        }}
+                        className={`font-bold text-xs px-4 py-3 rounded-xl transition flex items-center justify-center gap-2 border cursor-pointer ${
+                          copiedPrompt 
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                            : 'bg-slate-900 text-slate-300 hover:text-white border-slate-800'
+                        }`}
+                      >
+                        {copiedPrompt ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedPrompt ? 'Copied!' : 'Copy to Clipboard'}</span>
+                      </button>
+                    </div>
+
+                    {/* Preview Generated Prompt */}
+                    <details className="group border border-slate-850 rounded-xl overflow-hidden bg-slate-900/20">
+                      <summary className="flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-300 cursor-pointer select-none transition">
+                        <span>Preview Prompt Content</span>
+                        <ChevronDown className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="p-3 border-t border-slate-850 bg-black/40 font-mono text-[10px] text-slate-400 max-h-[140px] overflow-y-auto whitespace-pre-wrap select-all">
+                        {activePromptText}
+                      </div>
+                    </details>
+                  </div>
+
+                  {/* Step 4: Run Gemini & Upload JSON */}
+                  <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-850 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-xs text-indigo-400">4</div>
+                      <h3 className="text-sm font-bold text-slate-200">Run in Gemini & Upload Companion</h3>
+                    </div>
+
+                    <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-850/60 space-y-2.5 text-xs text-slate-300 leading-relaxed">
+                      <p className="font-semibold text-slate-200">To create the companion study cards:</p>
+                      <ol className="list-decimal pl-4.5 space-y-1.5 text-slate-400">
+                        <li>
+                          Open <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold inline-flex items-center gap-0.5 underline decoration-dotted">Google Gemini ↗</a>
+                        </li>
+                        <li>Upload your downloaded prompt file (or paste the prompt) into Gemini.</li>
+                        <li>Wait for Gemini to output the study dataset, then save it as a <strong className="text-slate-200">.json</strong> file (or copy the JSON response).</li>
+                      </ol>
+                    </div>
+
+                    {/* Drag & Drop JSON Dropzone */}
+                    <label 
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          handleGeminiJsonUpload(e.dataTransfer.files[0]);
+                        }
+                      }}
+                      className="group flex flex-col items-center justify-center border-2 border-dashed border-teal-500/20 hover:border-teal-400/80 bg-teal-950/5 hover:bg-teal-950/15 p-6 rounded-2xl transition-all cursor-pointer text-center"
+                    >
+                      <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center border border-teal-500/20 mb-2.5 group-hover:scale-105 transition-transform">
+                        <Upload className="w-5 h-5 text-teal-400" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-200">Drag & Drop Gemini's JSON File Here</p>
+                      <p className="text-[10px] text-slate-500 mt-1">or click to browse files</p>
+                      <span className="text-[9px] font-mono text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20 mt-2">Only .json files</span>
+                      <input
+                        id="gemini-json-uploader"
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleGeminiJsonUpload(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    {/* Advanced Collapsible Manual Paste JSON Textarea */}
+                    <details className="group border border-slate-850 rounded-xl overflow-hidden bg-slate-900/20">
+                      <summary className="flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-300 cursor-pointer select-none transition">
+                        <span>Advanced: Paste JSON Text Directly</span>
+                        <ChevronDown className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="p-3 border-t border-slate-850 space-y-3">
+                        <textarea
+                          id="song-json-textarea"
+                          value={songInputJson}
                           onChange={(e) => {
-                            const fileReader = new FileReader();
-                            if (e.target.files && e.target.files[0]) {
-                              fileReader.readAsText(e.target.files[0], "UTF-8");
-                              fileReader.onload = (event) => {
+                            setSongInputJson(e.target.value);
+                            setValidationError(null);
+                          }}
+                          placeholder={`{\n  "title": "La Camisa Negra",\n  "artist": "Juanes",\n  "youtubeId": "...",\n  "phrases": [...],\n  "vocab": [...]\n}`}
+                          className="w-full h-44 bg-slate-950 border border-slate-850 rounded-lg p-2.5 font-mono text-[11px] text-slate-300 focus:border-indigo-500 outline-none resize-none"
+                        />
+                        
+                        <div className="flex flex-wrap justify-between gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try {
+                                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(songData, null, 2));
+                                const downloadAnchor = document.createElement('a');
+                                downloadAnchor.setAttribute("href", dataStr);
+                                downloadAnchor.setAttribute("download", `${songData.title.toLowerCase().replace(/\s+/g, '_')}_companion.json`);
+                                document.body.appendChild(downloadAnchor);
+                                downloadAnchor.click();
+                                downloadAnchor.remove();
+                              } catch (e: any) {
+                                setValidationError(`Failed to export song backup: ${e.message}`);
+                              }
+                            }}
+                            className="bg-slate-900 hover:bg-slate-850 text-slate-350 font-bold text-[10px] px-2.5 py-1.5 rounded-lg border border-slate-800 transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <Download className="w-3 h-3 text-teal-400" /> Export Backup
+                          </button>
+
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSongInputJson('');
+                                setValidationError(null);
+                              }}
+                              className="bg-slate-900 hover:bg-slate-850 text-slate-450 hover:text-slate-300 font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition border border-slate-800 cursor-pointer"
+                            >
+                              Clear
+                            </button>
+                            <button
+                              id="merge-song-phrases-btn"
+                              onClick={() => {
                                 try {
-                                  const parsed = JSON.parse(event.target?.result as string);
+                                  if (!songInputJson.trim()) {
+                                    setValidationError("Please paste additional song JSON data first.");
+                                    return;
+                                  }
+                                  const parsed = extractAndCleanJSON(songInputJson);
+                                  const err = validateSongData(parsed, true);
+                                  if (err) {
+                                    setValidationError(err);
+                                    return;
+                                  }
+                                  
+                                  const currentPhrases = [...songData.phrases];
+                                  const normalizeSpan = (text: string) => {
+                                    if (!text) return '';
+                                    return text
+                                      .toLowerCase()
+                                      .replace(/[¿?¡!,\.;:"'\-_()[\]]/g, '')
+                                      .replace(/\s+/g, ' ')
+                                      .trim();
+                                  };
+                                  
+                                  const existingNorms = new Set(currentPhrases.map(p => normalizeSpan(p.spanish)));
+                                  let discardedPhraseCount = 0;
+                                  const filteredIncomingPhrases: any[] = [];
+                                  
+                                  if (Array.isArray(parsed.phrases)) {
+                                    for (const p of parsed.phrases) {
+                                      const norm = normalizeSpan(p.spanish);
+                                      if (existingNorms.has(norm)) {
+                                        discardedPhraseCount++;
+                                      } else {
+                                        filteredIncomingPhrases.push(p);
+                                        existingNorms.add(norm);
+                                      }
+                                    }
+                                  }
+                                  
+                                  const maxId = currentPhrases.reduce((max, p) => Math.max(max, p.id), 0);
+                                  const newPhrases = filteredIncomingPhrases.map((p: any, i: number) => ({
+                                    ...p,
+                                    id: maxId + 1 + i
+                                  }));
+                                  
+                                  const currentVocab = [...(songData.vocab || [])];
+                                  const existingVocabWords = new Set(currentVocab.map(v => v.word.toLowerCase().trim()));
+                                  let discardedVocabCount = 0;
+                                  const filteredIncomingVocab: any[] = [];
+                                  
+                                  if (Array.isArray(parsed.vocab)) {
+                                    for (const v of parsed.vocab) {
+                                      const normWord = v.word.toLowerCase().trim();
+                                      if (existingVocabWords.has(normWord)) {
+                                        discardedVocabCount++;
+                                      } else {
+                                        filteredIncomingVocab.push(v);
+                                        existingVocabWords.add(normWord);
+                                      }
+                                    }
+                                  }
+                                  
+                                  const rawMerged = {
+                                    ...songData,
+                                    phrases: [...currentPhrases, ...newPhrases],
+                                    vocab: [...currentVocab, ...filteredIncomingVocab]
+                                  };
+                                  const mergedSongData = sanitizeAndSortSongData(rawMerged, true);
+                                  
+                                  setSongData(mergedSongData);
+                                  localStorage.setItem('confieso_custom_song', JSON.stringify(mergedSongData));
+                                  
+                                  let msg = "Merge Completed Successfully!";
+                                  const parts: string[] = [];
+                                  if (newPhrases.length > 0) parts.push(`Appended ${newPhrases.length} phrases`);
+                                  if (discardedPhraseCount > 0) parts.push(`filtered ${discardedPhraseCount} duplicates`);
+                                  if (filteredIncomingVocab.length > 0) parts.push(`added ${filteredIncomingVocab.length} vocab terms`);
+                                  
+                                  setSuccessMessage(msg + (parts.length > 0 ? " " + parts.join(", ") + "." : ""));
+                                  setValidationError(null);
+                                  setValidationSuccess(true);
+                                  setTimeout(() => setValidationSuccess(false), 5000);
+                                } catch (e: any) {
+                                  setValidationError(`Invalid JSON format: ${e.message}`);
+                                }
+                              }}
+                              className="bg-indigo-950/85 hover:bg-indigo-900 border border-indigo-850 text-indigo-300 font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                            >
+                              Merge / Append
+                            </button>
+                            <button
+                              id="apply-custom-song-btn"
+                              onClick={() => {
+                                try {
+                                  if (!songInputJson.trim()) {
+                                    setValidationError("Please paste song JSON data before applying.");
+                                    return;
+                                  }
+                                  const parsed = extractAndCleanJSON(songInputJson);
                                   const err = validateSongData(parsed);
                                   if (err) {
-                                    setValidationError(`Import validation failed: ${err}`);
+                                    setValidationError(err);
                                     return;
                                   }
                                   const cleanedParsed = sanitizeAndSortSongData(parsed, false);
@@ -3147,180 +3155,55 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                                   setValidationError(null);
                                   setValidationSuccess(true);
                                   setTimeout(() => setValidationSuccess(false), 4000);
-                                } catch (err: any) {
-                                  setValidationError(`Import failed. Invalid JSON format: ${err.message}`);
+                                } catch (e: any) {
+                                  setValidationError(`Invalid JSON format: ${e.message}`);
                                 }
-                              };
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
+                              }}
+                              className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-[10px] px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer shadow"
+                            >
+                              Apply JSON
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </details>
 
-                    <div className="flex gap-2">
-                      <button
-                        id="clear-json-btn"
-                        onClick={() => {
-                          setSongInputJson('');
-                          setValidationError(null);
-                        }}
-                        className="bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 font-semibold text-xs px-3 py-2 rounded-lg transition cursor-pointer"
-                      >
-                        Clear Editor
-                      </button>
-                    </div>
+                    {validationError && (
+                      <div className="bg-rose-950/40 border border-rose-900/40 p-3 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{validationError}</span>
+                      </div>
+                    )}
+
+                    {validationSuccess && (
+                      <div className="bg-emerald-950/40 border border-emerald-900/40 p-3 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{successMessage || `Song Loaded Successfully!`}</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex justify-end gap-2 flex-wrap pt-1">
-                    <button
-                      id="merge-song-phrases-btn"
-                      onClick={() => {
-                        try {
-                          if (!songInputJson.trim()) {
-                            setValidationError("Please paste the additional song JSON data first.");
-                            return;
-                          }
-                          const parsed = extractAndCleanJSON(songInputJson);
-                          const err = validateSongData(parsed, true);
-                          if (err) {
-                            setValidationError(err);
-                            return;
-                          }
-                          
-                          // Merge phrases & prevent duplicates
-                          const currentPhrases = [...songData.phrases];
-                          
-                          // Normalize helper
-                          const normalizeSpan = (text: string) => {
-                            if (!text) return '';
-                            return text
-                              .toLowerCase()
-                              .replace(/[¿?¡!,\.;:"'\-_()[\]]/g, '')
-                              .replace(/\s+/g, ' ')
-                              .trim();
-                          };
-                          
-                          const existingNorms = new Set(currentPhrases.map(p => normalizeSpan(p.spanish)));
-                          
-                          let discardedPhraseCount = 0;
-                          const filteredIncomingPhrases: any[] = [];
-                          
-                          if (Array.isArray(parsed.phrases)) {
-                            for (const p of parsed.phrases) {
-                              const norm = normalizeSpan(p.spanish);
-                              if (existingNorms.has(norm)) {
-                                discardedPhraseCount++;
-                              } else {
-                                filteredIncomingPhrases.push(p);
-                                existingNorms.add(norm); // Keep track of duplicates within the new batch too
-                              }
-                            }
-                          }
-                          
-                          const maxId = currentPhrases.reduce((max, p) => Math.max(max, p.id), 0);
-                          
-                          // Re-index new filtered phrases sequentially
-                          const newPhrases = filteredIncomingPhrases.map((p: any, i: number) => ({
-                            ...p,
-                            id: maxId + 1 + i
-                          }));
-                          
-                          // Merge vocabulary & prevent duplicates
-                          const currentVocab = [...(songData.vocab || [])];
-                          const existingVocabWords = new Set(currentVocab.map(v => v.word.toLowerCase().trim()));
-                          
-                          let discardedVocabCount = 0;
-                          const filteredIncomingVocab: any[] = [];
-                          
-                          if (Array.isArray(parsed.vocab)) {
-                            for (const v of parsed.vocab) {
-                              const normWord = v.word.toLowerCase().trim();
-                              if (existingVocabWords.has(normWord)) {
-                                discardedVocabCount++;
-                              } else {
-                                filteredIncomingVocab.push(v);
-                                existingVocabWords.add(normWord);
-                              }
-                            }
-                          }
-                          
-                          const rawMerged = {
-                            ...songData,
-                            phrases: [...currentPhrases, ...newPhrases],
-                            vocab: [...currentVocab, ...filteredIncomingVocab]
-                          };
-                          const mergedSongData = sanitizeAndSortSongData(rawMerged, true);
-                          
-                          setSongData(mergedSongData);
-                          localStorage.setItem('confieso_custom_song', JSON.stringify(mergedSongData));
-                          
-                          // Prepare a detailed feedback message
-                          let msg = "Merge Completed Successfully!";
-                          const parts: string[] = [];
-                          if (newPhrases.length > 0) {
-                            parts.push(`Appended ${newPhrases.length} new phrases`);
-                          }
-                          if (discardedPhraseCount > 0) {
-                            parts.push(`filtered out ${discardedPhraseCount} duplicate phrases`);
-                          }
-                          if (filteredIncomingVocab.length > 0) {
-                            parts.push(`added ${filteredIncomingVocab.length} new vocab terms`);
-                          }
-                          if (discardedVocabCount > 0) {
-                            parts.push(`skipped ${discardedVocabCount} duplicate vocab terms`);
-                          }
-                          
-                          if (parts.length > 0) {
-                            msg += " Details: " + parts.join(", ") + ".";
-                          } else {
-                            msg += " No new unique phrases or vocabulary words were detected in the input.";
-                          }
-                          
-                          setSuccessMessage(msg);
-                          setValidationError(null);
-                          setValidationSuccess(true);
-                          setTimeout(() => {
-                            setValidationSuccess(false);
-                            setSuccessMessage('');
-                          }, 6000);
-                        } catch (e: any) {
-                          setValidationError(`Invalid JSON format: ${e.message}`);
-                        }
-                      }}
-                      className="bg-indigo-950/80 border border-indigo-700/50 hover:bg-indigo-900 text-indigo-200 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" /> Merge / Append Parts
-                    </button>
-                    <button
-                      id="apply-custom-song-btn"
-                      onClick={() => {
-                        try {
-                          if (!songInputJson.trim()) {
-                            setValidationError("Please paste song JSON data before applying.");
-                            return;
-                          }
-                          const parsed = extractAndCleanJSON(songInputJson);
-                          const err = validateSongData(parsed);
-                          if (err) {
-                            setValidationError(err);
-                            return;
-                          }
-                          
-                          // Save custom song
-                          const cleanedParsed = sanitizeAndSortSongData(parsed, false);
-                          setSongData(cleanedParsed);
-                          localStorage.setItem('confieso_custom_song', JSON.stringify(cleanedParsed));
-                          setValidationError(null);
-                          setValidationSuccess(true);
-                          setTimeout(() => setValidationSuccess(false), 4000);
-                        } catch (e: any) {
-                          setValidationError(`Invalid JSON format: ${e.message}`);
-                        }
-                      }}
-                      className="bg-teal-500 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl hover:bg-teal-400 transition shadow-lg shadow-teal-500/15 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Check className="w-4 h-4 stroke-[3]" /> Apply Custom Song
-                    </button>
+                  {/* Current Active Metadata summary card */}
+                  <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850/60 space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Lesson Metadata:</span>
+                    <div className="grid grid-cols-2 gap-4 text-xs pt-1">
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Lesson Title</span>
+                        <strong className="text-slate-200">{songData.title}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Speaker / Instructor</span>
+                        <strong className="text-slate-200">{songData.artist}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Study Phrases</span>
+                        <strong className="text-teal-400">{songData.phrases.length} cards</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Vocab Count</span>
+                        <strong className="text-indigo-400">{songData.vocab?.length || 0} terms</strong>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

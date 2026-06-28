@@ -56,37 +56,19 @@ The application features a single-screen layout with an elegant tab bar at the t
 - **Song Vocabulary**: Browse compiled high-frequency vocabulary from the song.
 - **Full Lyrics**: Read through the entire synced lyrics side-by-side.
 
-### 2. Customizing Song Metadata (JSON Format)
-Click on the **"Change / Import Song"** button in the header to open the customizer. You can edit the song data live in JSON format:
-```json
-{
-  "title": "Your Song Title",
-  "artist": "Artist Name",
-  "youtubeId": "YouTube_Video_ID",
-  "phrases": [
-    {
-      "id": 1,
-      "spanish": "Foreign lyrics here",
-      "english": "English equivalent",
-      "literal": "Word-for-word translation",
-      "category": "Song section (e.g. Verse 1)",
-      "timestamp": 12.5,
-      "timestampStr": "0:12",
-      "breakdown": [
-        { "word": "ForeignWord", "meaning": "EnglishMeaning" }
-      ]
-    }
-  ],
-  "vocab": [
-    {
-      "word": "ForeignWord",
-      "definition": "Definition",
-      "example": "Context sentence"
-    }
-  ]
-}
-```
-*Tip: You can use LLMs like Google Gemini to generate these JSON payloads for any song in seconds, then paste them directly into the loader!*
+### 2. Streamlined 4-Step Lesson Creator (with Gemini AI)
+To add any new song or language lesson with high-fidelity interactive companion materials, click **"Change / Import Song"** in the header and follow these simple steps:
+
+1. **Step 1: Set Lesson & Language Details**: Input the target language (e.g., Spanish, French), translation language (e.g., English), YouTube video link or ID, and optional title/artist fields.
+2. **Step 2: Provide Raw Video Transcript**: Drag-and-drop or paste a raw transcript of the video. It can have standard raw timestamps (e.g. `1:24 Bonjour à tous`).
+3. **Step 3: Download Gemini Prompt File**: Click **Download Prompt File** to save a pre-formulated, detailed `.txt` instruction prompt configured with your inputs and transcript.
+4. **Step 4: Process with Gemini & Upload**:
+   - Open [Google Gemini](https://gemini.google.com).
+   - Drag and drop your downloaded prompt file into Gemini and send the message.
+   - Gemini will translate every line, map timestamps, create contextual vocabulary lists, extract grammatical breakdowns, and return a perfectly formatted `.json` file.
+   - Drag and drop the resulting `.json` file from Gemini directly back into the application's dropzone. 
+
+*Your interactive song deck, synchronized subtitles, multi-choice quiz cards, and dictation spell-checks will be instantly ready to practice!*
 
 ---
 
