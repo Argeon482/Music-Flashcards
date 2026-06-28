@@ -507,8 +507,35 @@ export default function App() {
   };
 
   const [activeTab, setActiveTab] = useState<string>('flashcards'); // flashcards, quiz, dictation, vocab, lyrics
-  const [currentDeck, setCurrentDeck] = useState<string>('All'); // All, Support, Struggle, Hope, Vulnerability, Starred
+  const [selectedDecks, setSelectedDecks] = useState<string[]>(['All']);
   const [starredIds, setStarredIds] = useState<number[]>([]);
+
+  const getDeckKey = (decks: string[]) => {
+    return [...decks].sort().join('_').toLowerCase();
+  };
+
+  const toggleDeck = (deckId: string) => {
+    setSelectedDecks(prev => {
+      if (deckId === 'All') {
+        return ['All'];
+      }
+      if (deckId === 'Starred') {
+        return ['Starred'];
+      }
+      
+      let next = prev.filter(d => d !== 'All' && d !== 'Starred');
+      if (next.includes(deckId)) {
+        next = next.filter(d => d !== deckId);
+      } else {
+        next = [...next, deckId];
+      }
+      
+      if (next.length === 0) {
+        return ['All'];
+      }
+      return next;
+    });
+  };
   
   // Custom Song state loading
   const [songData, setSongData] = useState<SongData>(() => {
@@ -1266,7 +1293,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
   useEffect(() => {
     setCardHistory([]);
-  }, [currentDeck]);
+  }, [selectedDecks]);
   
   // Audio configuration states
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -1454,9 +1481,9 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
   // Filtered Cards based on active Category Deck
   const filteredPhrases = songData.phrases.filter(phrase => {
-    if (currentDeck === 'All') return true;
-    if (currentDeck === 'Starred') return starredIds.includes(phrase.id);
-    return phrase.category.toLowerCase().includes(currentDeck.toLowerCase());
+    if (selectedDecks.includes('All')) return true;
+    if (selectedDecks.includes('Starred')) return starredIds.includes(phrase.id);
+    return selectedDecks.some(deck => phrase.category.toLowerCase() === deck.toLowerCase());
   });
 
   const activePhrase: Phrase | undefined = filteredPhrases[cardIndex];
@@ -1526,7 +1553,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
       }
 
       // Reset to All deck first
-      setCurrentDeck('All');
+      setSelectedDecks(['All']);
 
       // Load saved index for 'all' deck
       const savedCardIndex = localStorage.getItem(`confieso_card_index_${songKey}_all`);
@@ -1546,10 +1573,10 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
   useEffect(() => {
     if (cardIndex >= 0) {
       const songKey = songData.title.replace(/\s+/g, '_').toLowerCase();
-      const deckKey = currentDeck.toLowerCase();
+      const deckKey = getDeckKey(selectedDecks);
       localStorage.setItem(`confieso_card_index_${songKey}_${deckKey}`, cardIndex.toString());
     }
-  }, [cardIndex, songData.title, currentDeck]);
+  }, [cardIndex, songData.title, selectedDecks]);
 
   // Save Starred Progress to localStorage
   useEffect(() => {
@@ -1610,7 +1637,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
   useEffect(() => {
     try {
       const songKey = songData.title.replace(/\s+/g, '_').toLowerCase();
-      const deckKey = currentDeck.toLowerCase();
+      const deckKey = getDeckKey(selectedDecks);
       const savedCardIndex = localStorage.getItem(`confieso_card_index_${songKey}_${deckKey}`);
       if (savedCardIndex) {
         const parsedIdx = parseInt(savedCardIndex, 10);
@@ -1626,7 +1653,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     } catch (e) {
       console.error("Error restoring deck card index", e);
     }
-  }, [currentDeck]);
+  }, [selectedDecks]);
 
   // Bounds safety guard to make sure cardIndex doesn't exceed filteredPhrases length
   useEffect(() => {
@@ -1656,6 +1683,47 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
   };
 
   const lastPlayedIdRef = useRef<number | null>(null);
+  const isAutoProgressionRef = useRef<boolean>(false);
+
+  // Sync card index to current video playback time as the video progresses when auto-play is on
+  useEffect(() => {
+    if (!autoPlayOnCardChange || filteredPhrases.length === 0 || !(activeTab === 'flashcards' || activeTab === 'lyrics')) return;
+
+    const interval = setInterval(() => {
+      let curr = -1;
+      let isPlaying = false;
+      
+      if (mediaPlayerType === 'local' && videoPlayerRef.current) {
+        curr = videoPlayerRef.current.currentTime;
+        isPlaying = !videoPlayerRef.current.paused;
+      } else if (mediaPlayerType === 'youtube' && ytPlayerInstanceRef.current && typeof ytPlayerInstanceRef.current.getCurrentTime === 'function') {
+        try {
+          curr = ytPlayerInstanceRef.current.getCurrentTime();
+          isPlaying = ytPlayerInstanceRef.current.getPlayerState() === 1; // 1 = playing
+        } catch (e) {}
+      }
+
+      if (isPlaying && curr >= 0) {
+        // Find the index in filteredPhrases that matches current time
+        let matchingIdx = -1;
+        for (let i = 0; i < filteredPhrases.length; i++) {
+          const start = filteredPhrases[i].timestamp;
+          const end = i < filteredPhrases.length - 1 ? filteredPhrases[i + 1].timestamp : Infinity;
+          if (curr >= start && curr < end) {
+            matchingIdx = i;
+            break;
+          }
+        }
+        
+        if (matchingIdx !== -1 && matchingIdx !== cardIndex) {
+          isAutoProgressionRef.current = true;
+          setCardIndex(matchingIdx);
+        }
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [autoPlayOnCardChange, filteredPhrases, cardIndex, activeTab, mediaPlayerType]);
 
   // Trigger timestamp sync on phrase change if we are studying in flashcards or lyrics tab
   useEffect(() => {
@@ -1663,7 +1731,12 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
       if (lastPlayedIdRef.current !== activePhrase.id) {
         lastPlayedIdRef.current = activePhrase.id;
         if (autoPlayOnCardChange) {
-          playAtTimestamp(activePhrase.timestamp);
+          if (isAutoProgressionRef.current) {
+            // Reached naturally by playhead progression, consume flag without seeking
+            isAutoProgressionRef.current = false;
+          } else {
+            playAtTimestamp(activePhrase.timestamp);
+          }
         }
       }
     }
@@ -1707,7 +1780,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
     if (activeTab === 'quiz') {
       generateQuiz();
     }
-  }, [activeTab, currentDeck]);
+  }, [activeTab, selectedDecks]);
 
   // Audio Playback Handler (Text to Speech browser voice)
   const speakText = (text: string, lang: 'es' | 'en' = 'es') => {
@@ -2945,20 +3018,24 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 })),
                 { id: 'Starred', label: `Stars (${starredIds.length})` },
               ] as Array<{ id: string; label: string }>
-            ).map(deck => (
-              <button
-                key={deck.id}
-                id={`deck-filter-${deck.id.replace(/\s+/g, '_')}`}
-                onClick={() => setCurrentDeck(deck.id)}
-                className={`text-xs px-3 py-1.5 rounded-xl font-medium transition-all ${
-                  currentDeck === deck.id
-                    ? 'bg-slate-800 text-teal-300 border border-teal-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-                }`}
-              >
-                {deck.label}
-              </button>
-            ))}
+            ).map(deck => {
+              const isSelected = selectedDecks.includes(deck.id);
+              return (
+                <button
+                  key={deck.id}
+                  id={`deck-filter-${deck.id.replace(/\s+/g, '_')}`}
+                  onClick={() => toggleDeck(deck.id)}
+                  className={`text-xs px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-800 text-teal-300 border border-teal-500/30 font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+                  }`}
+                  title={deck.id === 'All' ? "Show all phrases" : deck.id === 'Starred' ? "Show starred phrases only" : `Toggle ${deck.label} section`}
+                >
+                  {deck.label}
+                </button>
+              );
+            })}
           </div>
 
           {filteredPhrases.length === 0 ? (
@@ -2966,14 +3043,14 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               <Star className="w-12 h-12 text-slate-600 mx-auto" />
               <h3 className="text-lg font-bold text-slate-300">This study deck is empty</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-                {currentDeck === 'Starred' 
+                {selectedDecks.includes('Starred') 
                   ? "Mark key song phrases with the Star icon while studying flashcards to collect them in your personalized review deck!" 
                   : "No items match your active filters. Try resetting to access the full catalog."}
               </p>
               <button 
                 id="reset-deck-btn"
-                onClick={() => setCurrentDeck('All')}
-                className="bg-teal-500 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-teal-400 transition shadow-lg shadow-teal-500/10"
+                onClick={() => setSelectedDecks(['All'])}
+                className="bg-teal-500 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-teal-400 transition shadow-lg shadow-teal-500/10 cursor-pointer"
               >
                 Reset to All Phrases
               </button>
@@ -3770,7 +3847,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                                   setCardIndex(filteredIdx);
                                 } else {
                                   // Revert filter to All so they can practice this card
-                                  setCurrentDeck('All');
+                                  setSelectedDecks(['All']);
                                   const allIdx = songData.phrases.findIndex(p => p.id === phrase.id);
                                   if (allIdx !== -1) {
                                     setCardIndex(allIdx);
