@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, onSnapshot, terminate, setLogLevel } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "gen-lang-client-0632461304",
@@ -13,9 +13,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Suppress Firestore internal logs (retry warnings on quota limit, etc.)
+try {
+  setLogLevel('silent');
+} catch (e) {
+  console.warn("Failed to set Firestore log level to silent:", e);
+}
 
-export { collection, getDocs, setDoc, doc, deleteDoc, onSnapshot };
+const isQuotaExceededToday = typeof window !== 'undefined' && localStorage.getItem('firestore_quota_exceeded_today') === 'true';
+
+export const db = isQuotaExceededToday ? null : getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+export { collection, getDocs, setDoc, doc, deleteDoc, onSnapshot, terminate };
 
 export interface FirestoreErrorInfo {
   code: string;

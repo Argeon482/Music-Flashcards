@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { SONG_DATA } from './data';
 import { Phrase, PhraseBreakdown, VocabTerm, SongData } from './types';
-import { db, collection, onSnapshot, setDoc, doc, deleteDoc, handleFirestoreError } from './firebase';
+import { db, collection, onSnapshot, setDoc, doc, deleteDoc, handleFirestoreError, terminate } from './firebase';
 
 
 // PROMPT TEMPLATES dictionary for seamless external generation
@@ -930,10 +930,58 @@ export default function App() {
   });
 
   // Cloud Sync state
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'error' | 'quota-exceeded'>(() => {
+    const isExceeded = localStorage.getItem('firestore_quota_exceeded_today') === 'true';
+    return isExceeded ? 'quota-exceeded' : 'synced';
+  });
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(() => {
+    return localStorage.getItem('firestore_quota_exceeded_today') === 'true';
+  });
+
+  const isQuotaExceededRef = useRef<boolean>(localStorage.getItem('firestore_quota_exceeded_today') === 'true');
+
+  useEffect(() => {
+    isQuotaExceededRef.current = isQuotaExceeded;
+  }, [isQuotaExceeded]);
+
+  const saveTimeoutRef = useRef<any>(null);
+  const saveNoteTimeoutRef = useRef<Record<number, any>>({});
+
+  const checkIsQuotaExceededError = (error: any): boolean => {
+    if (!error) return false;
+    const msg = String(error.message || error.toString() || '').toLowerCase();
+    const code = String(error.code || '').toLowerCase();
+    return code === 'resource-exhausted' || msg.includes('quota') || msg.includes('exhausted');
+  };
+
+  const handleQuotaExceeded = () => {
+    setIsQuotaExceeded(true);
+    isQuotaExceededRef.current = true;
+    setCloudSyncStatus('quota-exceeded');
+    localStorage.setItem('firestore_quota_exceeded_today', 'true');
+    if (db) {
+      terminate(db).catch(err => console.error("Error terminating firestore:", err));
+    }
+  };
+
+  const handleResetQuotaCheck = () => {
+    localStorage.removeItem('firestore_quota_exceeded_today');
+    window.location.reload();
+  };
+
+  // Terminate Firestore immediately if quota is already known to be exceeded
+  useEffect(() => {
+    if (isQuotaExceeded && db) {
+      terminate(db).catch(err => console.error("Error terminating firestore on load:", err));
+    }
+  }, [isQuotaExceeded]);
 
   // Cloud helper to save a song to Firestore
   const saveSongToCloud = async (song: SongData) => {
+    if (!db || isQuotaExceededRef.current) {
+      setCloudSyncStatus('quota-exceeded');
+      return;
+    }
     const songId = `${song.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}_${song.artist.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
     let payload: any = null;
     try {
@@ -941,19 +989,28 @@ export default function App() {
       const songDocRef = doc(db, 'songs', songId);
       
       // Sanitize fields to ensure Firestore-compatible payload matching SongData and Phrase structure
-      const sanitizedPhrases = song.phrases.map(p => ({
-        id: p.id,
-        spanish: p.spanish || '',
-        english: p.english || '',
-        literal: p.literal || '',
-        category: p.category || '',
-        timestamp: p.timestamp || 0,
-        timestampStr: p.timestampStr || '',
-        breakdown: (p.breakdown || []).map(b => ({
-          word: b.word || '',
-          meaning: b.meaning || ''
-        }))
-      }));
+      const sanitizedPhrases = song.phrases.map(p => {
+        const item: any = {
+          id: p.id,
+          spanish: p.spanish || '',
+          english: p.english || '',
+          literal: p.literal || '',
+          category: p.category || '',
+          timestamp: p.timestamp || 0,
+          timestampStr: p.timestampStr || '',
+          breakdown: (p.breakdown || []).map(b => ({
+            word: b.word || '',
+            meaning: b.meaning || ''
+          }))
+        };
+        if (p.timestampEnd !== undefined) {
+          item.timestampEnd = p.timestampEnd;
+        }
+        if (p.timestampEndStr !== undefined) {
+          item.timestampEndStr = p.timestampEndStr;
+        }
+        return item;
+      });
 
       const sanitizedVocab = (song.vocab || []).map(v => ({
         word: v.word || '',
@@ -973,30 +1030,57 @@ export default function App() {
 
       await setDoc(songDocRef, payload);
       setCloudSyncStatus('synced');
-    } catch (e) {
-      console.error("Failed to save song to Firestore:", e);
-      setCloudSyncStatus('error');
-      handleFirestoreError(e, 'songs', 'create', `songs/${songId}`, payload);
+    } catch (e: any) {
+      if (checkIsQuotaExceededError(e)) {
+        handleQuotaExceeded();
+      } else {
+        console.error("Failed to save song to Firestore:", e);
+        setCloudSyncStatus('error');
+        handleFirestoreError(e, 'songs', 'create', `songs/${songId}`, payload);
+      }
     }
+  };
+
+  // Debounced cloud save helper to throttle fast consecutive updates (e.g., from dragging timeline sliders)
+  const saveSongToCloudDebounced = (song: SongData) => {
+    if (isQuotaExceededRef.current) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveSongToCloud(song);
+    }, 2000);
   };
 
   // Cloud helper to delete a song from Firestore
   const deleteSongFromCloud = async (song: SongData) => {
+    if (!db || isQuotaExceededRef.current) {
+      setCloudSyncStatus('quota-exceeded');
+      return;
+    }
     const songId = `${song.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}_${song.artist.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
     try {
       setCloudSyncStatus('syncing');
       const songDocRef = doc(db, 'songs', songId);
       await deleteDoc(songDocRef);
       setCloudSyncStatus('synced');
-    } catch (e) {
-      console.error("Failed to delete song from Firestore:", e);
-      setCloudSyncStatus('error');
-      handleFirestoreError(e, 'songs', 'delete', `songs/${songId}`);
+    } catch (e: any) {
+      if (checkIsQuotaExceededError(e)) {
+        handleQuotaExceeded();
+      } else {
+        console.error("Failed to delete song from Firestore:", e);
+        setCloudSyncStatus('error');
+        handleFirestoreError(e, 'songs', 'delete', `songs/${songId}`);
+      }
     }
   };
 
   // Cloud helper to save buddy study notes to Firestore
   const saveNoteToCloud = async (phraseId: number, partnerA?: string, partnerB?: string) => {
+    if (!db || isQuotaExceededRef.current) {
+      setCloudSyncStatus('quota-exceeded');
+      return;
+    }
     const noteId = `note_${phraseId}`;
     const payload = {
       phraseId,
@@ -1009,15 +1093,23 @@ export default function App() {
       const noteDocRef = doc(db, 'study_notes', noteId);
       await setDoc(noteDocRef, payload);
       setCloudSyncStatus('synced');
-    } catch (e) {
-      console.error("Failed to save notes to Firestore:", e);
-      setCloudSyncStatus('error');
-      handleFirestoreError(e, 'study_notes', 'create', `study_notes/${noteId}`, payload);
+    } catch (e: any) {
+      if (checkIsQuotaExceededError(e)) {
+        handleQuotaExceeded();
+      } else {
+        console.error("Failed to save notes to Firestore:", e);
+        setCloudSyncStatus('error');
+        handleFirestoreError(e, 'study_notes', 'create', `study_notes/${noteId}`, payload);
+      }
     }
   };
 
   // Cloud listener for Real-time Sync
   useEffect(() => {
+    if (isQuotaExceeded || !db) {
+      setCloudSyncStatus('quota-exceeded');
+      return;
+    }
     setCloudSyncStatus('syncing');
     
     // Subscribe to shared songs collection
@@ -1047,9 +1139,13 @@ export default function App() {
       localStorage.setItem('confieso_song_library', JSON.stringify(updatedList));
       setCloudSyncStatus('synced');
     }, (error) => {
-      console.error("Firestore songs sync error:", error);
-      setCloudSyncStatus('error');
-      handleFirestoreError(error, 'songs', 'list', 'songs');
+      if (checkIsQuotaExceededError(error)) {
+        handleQuotaExceeded();
+      } else {
+        console.error("Firestore songs sync error:", error);
+        setCloudSyncStatus('error');
+        handleFirestoreError(error, 'songs', 'list', 'songs');
+      }
     });
 
     // Subscribe to shared study notes collection
@@ -1072,40 +1168,115 @@ export default function App() {
       });
       setCloudSyncStatus('synced');
     }, (error) => {
-      console.error("Firestore study_notes sync error:", error);
-      setCloudSyncStatus('error');
-      handleFirestoreError(error, 'study_notes', 'list', 'study_notes');
+      if (checkIsQuotaExceededError(error)) {
+        handleQuotaExceeded();
+      } else {
+        console.error("Firestore study_notes sync error:", error);
+        setCloudSyncStatus('error');
+        handleFirestoreError(error, 'study_notes', 'list', 'study_notes');
+      }
     });
 
     return () => {
       unsubSongs();
       unsubNotes();
     };
-  }, []);
+  }, [isQuotaExceeded]);
+
+  const savedSongsRef = useRef<SongData[]>(savedSongs);
+  useEffect(() => {
+    savedSongsRef.current = savedSongs;
+  }, [savedSongs]);
 
   // Auto-sync current active song into the savedSongs library & Firestore
   useEffect(() => {
-    setSavedSongs((prevLibrary) => {
-      const index = prevLibrary.findIndex(
-        (s) => s.title.toLowerCase().trim() === songData.title.toLowerCase().trim() &&
-               s.artist.toLowerCase().trim() === songData.artist.toLowerCase().trim()
-      );
-      if (index !== -1) {
-        if (JSON.stringify(prevLibrary[index]) !== JSON.stringify(songData)) {
-          const updated = [...prevLibrary];
-          updated[index] = songData;
-          localStorage.setItem('confieso_song_library', JSON.stringify(updated));
-          saveSongToCloud(songData);
-          return updated;
-        }
-      } else {
-        const updated = [...prevLibrary, songData];
-        localStorage.setItem('confieso_song_library', JSON.stringify(updated));
-        saveSongToCloud(songData);
-        return updated;
+    const existing = savedSongsRef.current.find(
+      (s) => s.title.toLowerCase().trim() === songData.title.toLowerCase().trim() &&
+             s.artist.toLowerCase().trim() === songData.artist.toLowerCase().trim()
+    );
+
+    const isSongEqual = (s1: SongData, s2: SongData) => {
+      if (s1.title.toLowerCase().trim() !== s2.title.toLowerCase().trim() || 
+          s1.artist.toLowerCase().trim() !== s2.artist.toLowerCase().trim()) {
+        return false;
       }
-      return prevLibrary;
-    });
+      if ((s1.youtubeId || '') !== (s2.youtubeId || '')) {
+        return false;
+      }
+      if (s1.phrases.length !== s2.phrases.length) return false;
+      
+      for (let i = 0; i < s1.phrases.length; i++) {
+        const p1 = s1.phrases[i];
+        const p2 = s2.phrases[i];
+        if (
+          p1.id !== p2.id ||
+          (p1.spanish || '') !== (p2.spanish || '') ||
+          (p1.english || '') !== (p2.english || '') ||
+          (p1.literal || '') !== (p2.literal || '') ||
+          (p1.category || '') !== (p2.category || '') ||
+          (p1.timestamp || 0) !== (p2.timestamp || 0) ||
+          (p1.timestampStr || '') !== (p2.timestampStr || '')
+        ) {
+          return false;
+        }
+
+        const t1_end = p1.timestampEnd !== undefined ? p1.timestampEnd : null;
+        const t2_end = p2.timestampEnd !== undefined ? p2.timestampEnd : null;
+        const t1_endStr = p1.timestampEndStr || '';
+        const t2_endStr = p2.timestampEndStr || '';
+        
+        if (t1_end !== t2_end || t1_endStr !== t2_endStr) {
+          return false;
+        }
+
+        const b1 = p1.breakdown || [];
+        const b2 = p2.breakdown || [];
+        if (b1.length !== b2.length) return false;
+        for (let j = 0; j < b1.length; j++) {
+          if ((b1[j].word || '') !== (b2[j].word || '') || (b1[j].meaning || '') !== (b2[j].meaning || '')) {
+            return false;
+          }
+        }
+      }
+
+      const v1 = s1.vocab || [];
+      const v2 = s2.vocab || [];
+      if (v1.length !== v2.length) return false;
+      for (let i = 0; i < v1.length; i++) {
+        if ((v1[i].word || '') !== (v2[i].word || '') || 
+            (v1[i].definition || '') !== (v2[i].definition || '') || 
+            (v1[i].example || '') !== (v2[i].example || '')) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    if (!existing || !isSongEqual(existing, songData)) {
+      setSavedSongs((prevLibrary) => {
+        const index = prevLibrary.findIndex(
+          (s) => s.title.toLowerCase().trim() === songData.title.toLowerCase().trim() &&
+                 s.artist.toLowerCase().trim() === songData.artist.toLowerCase().trim()
+        );
+        const updated = [...prevLibrary];
+        if (index !== -1) {
+          updated[index] = songData;
+        } else {
+          updated.push(songData);
+        }
+        localStorage.setItem('confieso_song_library', JSON.stringify(updated));
+        return updated;
+      });
+
+      const isDefaultAndUntouched = songData.title.toLowerCase().trim() === SONG_DATA.title.toLowerCase().trim() &&
+                                    songData.artist.toLowerCase().trim() === SONG_DATA.artist.toLowerCase().trim() &&
+                                    (!existing || isSongEqual(existing, SONG_DATA));
+
+      if (!isDefaultAndUntouched) {
+        saveSongToCloudDebounced(songData);
+      }
+    }
   }, [songData]);
 
   const [showSongManager, setShowSongManager] = useState<boolean>(false);
@@ -1146,7 +1317,17 @@ export default function App() {
         [phraseId]: updatedNotes
       };
       localStorage.setItem('buddy_phrase_notes', JSON.stringify(updated));
-      saveNoteToCloud(phraseId, updatedNotes.partnerA, updatedNotes.partnerB);
+      
+      if (!isQuotaExceededRef.current) {
+        if (saveNoteTimeoutRef.current[phraseId]) {
+          clearTimeout(saveNoteTimeoutRef.current[phraseId]);
+        }
+        saveNoteTimeoutRef.current[phraseId] = setTimeout(() => {
+          saveNoteToCloud(phraseId, updatedNotes.partnerA, updatedNotes.partnerB);
+          delete saveNoteTimeoutRef.current[phraseId];
+        }, 2000);
+      }
+
       return updated;
     });
   };
@@ -2598,6 +2779,22 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-slate-950">
       
+      {isQuotaExceeded && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/15 to-amber-500/10 border-b border-amber-500/20 px-4 py-2 sm:py-2.5 text-center text-xs text-amber-200 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 transition-all shadow-lg z-[60] relative">
+          <div className="flex items-center gap-1.5 justify-center">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-medium">Cloud Sync limit reached (daily free tier quota exhausted).</span>
+          </div>
+          <span className="text-amber-300/80">All edits, flashcards, & notes are safe and saved in your browser!</span>
+          <button
+            onClick={handleResetQuotaCheck}
+            className="mt-1 sm:mt-0 text-[10px] font-bold bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-2.5 py-1 rounded transition shadow cursor-pointer animate-pulse"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+
       {/* HEADER SECTION */}
       <header className={`relative border-b border-slate-900 bg-[#020617]/85 px-4 sticky top-0 z-50 backdrop-blur-md transition-all duration-300 ${showHeaderDetails ? 'py-4' : 'py-2 sm:py-2.5'}`}>
         <div className={`${isFullscreen ? 'max-w-full px-4 lg:px-8' : 'max-w-7xl'} mx-auto flex flex-col ${showHeaderDetails ? 'gap-4' : 'gap-0'} transition-all duration-300`}>
@@ -2732,6 +2929,16 @@ ${promptTranscript.trim() || "(Please upload a transcript file above or type/pas
                             <CloudOff className="w-2.5 h-2.5 text-rose-400" />
                             <span>Sync Offline</span>
                           </span>
+                        )}
+                        {cloudSyncStatus === 'quota-exceeded' && (
+                          <button
+                            onClick={handleResetQuotaCheck}
+                            className="text-[9px] text-amber-400 font-mono bg-amber-500/10 hover:bg-amber-500/20 px-1 py-0.5 rounded border border-amber-500/20 flex items-center gap-1 transition cursor-pointer"
+                            title="Quota exceeded. Click to retry sync."
+                          >
+                            <CloudOff className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
+                            <span>Quota Reached (Local Mode) - Click to Retry</span>
+                          </button>
                         )}
                       </h4>
                       <p className="text-[11px] text-slate-400">Test your recall! Select whether the card front shows the target phrase or its English translation.</p>
