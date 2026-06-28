@@ -270,16 +270,14 @@ function sanitizeAndSortSongData(data: SongData, preserveExistingIds = false): S
     phrases: finalizedPhrases,
     vocab: uniqueVocab
   };
-}
-
-const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
+}const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
     flashcards: 'Flashcards',
     quiz: 'Quiz Challenge',
     dictation: 'Spelling Arena',
-    vocab: 'Song Vocab',
-    lyrics: 'Full Lyrics',
-    change_import: 'Change / Import Song',
+    vocab: 'Lesson Vocab',
+    lyrics: 'Video Lines',
+    change_import: 'Change / Import Lesson',
     prev: 'Previous',
     next: 'Next',
     reveal_translation: 'Reveal Translation',
@@ -287,11 +285,11 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     current_card_timestamp: 'Current Card Timestamp:',
     trim_time: 'Trim Time',
     reset_to_default: 'Reset to Default',
-    load_demo_song: 'Load Demo Song',
-    create_blank_song: 'Create New Blank Song',
-    song_customizer_title: 'Song Customizer & Loader',
-    song_library_title: 'Your Saved Song Library',
-    lyrics_instruction: "Click any lyric's Play button to sync and jump both the YouTube player and local player directly to that line's precise timestamp.",
+    load_demo_song: 'Load Demo Lesson',
+    create_blank_song: 'Create New Blank Lesson',
+    song_customizer_title: 'Lesson Customizer & Loader',
+    song_library_title: 'Your Saved Lesson Library',
+    lyrics_instruction: "Click any line's Play button to sync and jump both the video player and local player directly to that line's precise timestamp.",
     back_card: 'Back Card',
     front_card: 'Front Card',
     check_answer: 'Check Answer',
@@ -306,15 +304,76 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     next_phrase: 'Next Phrase',
     settings: 'Settings',
     language: 'App Language',
-    click_to_reveal: 'Click to reveal translation'
+    click_to_reveal: 'Click to reveal translation',
+    self_assess: 'Self-Assess your confidence for this phrase:',
+    hard: 'Hard / Again',
+    medium: 'Medium',
+    easy: 'Easy / Mastered',
+    card_traversal_mode: 'Card Traversal Mode',
+    random_label: 'Random:',
+    spaced_rep_label: 'Spaced Rep:',
+    on: 'On',
+    off: 'Off',
+    spaced_rep_tip: '🎓 Prioritizes cards rated Hard & unrated cards over Easy cards based on your historical answers.',
+    phrase: 'Phrase',
+    of: 'of',
+    mastered: 'Mastered',
+    video_section: 'Video Section:',
+    status_spaced_rep: 'Active: Spaced Rep',
+    status_random: 'Active: Random Shuffle',
+    status_sequential: 'Active: Sequential',
+    study_tip_title: 'ACTIVE LESSON STUDY TIP:',
+    study_tip_observe: 'Observe how the speaker states',
+    study_tip_translates: 'This translates to',
+    study_tip_breakdown: 'Key word breakdown:',
+    study_tip_practice: 'Practice vocalizing this in sync with the video speech!',
+    linguistic_breakdown: 'Linguistic Sentence Breakdown',
+    start_trim: 'Start Trim',
+    start_time: 'Start Time:',
+    end_trim: 'End Trim (Auto-Stop Target)',
+    end_time: 'End Time:',
+    estimated: '(Estimated)',
+    stop_video_after: 'Stop video after saying phrase:',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    card_study_notes: 'Card Study Notes',
+    my_study_notes: 'My Study Notes (Appears on Back of Card)',
+    add_notes_placeholder: 'Add your notes on pronunciation, inflections, slang, grammar explanations, or reminders here...',
+    media_hub: 'Media Hub',
+    youtube_video: 'YouTube Video',
+    local_file: 'Local File',
+    video_playback_mode: 'Video Playback Mode:',
+    stop_after_phrase: 'Stop after phrase',
+    continuous_play: 'Continuous play',
+    lesson_title_prefix: 'Lesson:',
+    original_video: 'Original Video',
+    practicing_timestamps_info: 'Practicing timestamps will automatically seek the video stream. You can also manually pause/play standard Youtube controls.',
+    file_label: 'File:',
+    remove_file: 'Remove file',
+    drag_drop_prefix: 'Drag & Drop',
+    drag_drop_suffix: "'s media file here",
+    or_browse: 'or browse your system files',
+    browse_files: 'Browse Files',
+    how_offline_works: 'How offline local mode works:',
+    how_offline_desc_prefix: 'By downloading',
+    how_offline_desc_suffix: "'s lesson video/audio locally and uploading it here, you get lag-free exact seek accuracy. Your browser handles this completely locally; nothing uploaded leaves your machine.",
+    quick_jump: 'Quick Jump Sections:',
+    delete_lesson_title: 'Permanently Delete Lesson?',
+    delete_lesson_desc: 'You are about to permanently delete',
+    delete_lesson_warning: "Warning: This will delete this lesson's phrases, flashcards, vocabulary terms, and sync files from both Firestore Cloud and your local storage. This action is final and cannot be undone.",
+    delete_lesson_confirm_prompt: 'Type DELETE below to confirm:',
+    delete_word_target: 'DELETE',
+    delete_word_placeholder: 'Type DELETE...',
+    cancel: 'Cancel',
+    delete_action: 'Permanently Delete',
   },
   es: {
     flashcards: 'Tarjetas',
     quiz: 'Desafío de Quiz',
     dictation: 'Arena de Deletreo',
     vocab: 'Vocabulario',
-    lyrics: 'Letras Completas',
-    change_import: 'Cambiar / Importar Canción',
+    lyrics: 'Líneas del Video',
+    change_import: 'Cambiar / Importar Lección',
     prev: 'Anterior',
     next: 'Siguiente',
     reveal_translation: 'Revelar Traducción',
@@ -323,9 +382,9 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     trim_time: 'Ajustar Tiempo',
     reset_to_default: 'Restablecer',
     load_demo_song: 'Cargar Demostración',
-    create_blank_song: 'Crear Canción Vacía',
-    song_customizer_title: 'Personalizador de Canciones',
-    song_library_title: 'Tu Biblioteca de Canciones',
+    create_blank_song: 'Crear Lección Vacía',
+    song_customizer_title: 'Personalizador de Lecciones',
+    song_library_title: 'Tu Biblioteca de Lecciones',
     lyrics_instruction: 'Haz clic en el botón de reproducción de cualquier letra para sincronizar y saltar directamente al tiempo de esa línea.',
     back_card: 'Reverso',
     front_card: 'Frente',
@@ -341,15 +400,76 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     next_phrase: 'Siguiente Frase',
     settings: 'Configuración',
     language: 'Idioma de la App',
-    click_to_reveal: 'Haz clic para revelar traducción'
+    click_to_reveal: 'Haz clic para revelar traducción',
+    self_assess: 'Evalúa tu nivel de confianza para esta frase:',
+    hard: 'Difícil / Repetir',
+    medium: 'Medio',
+    easy: 'Fácil / Dominado',
+    card_traversal_mode: 'Modo de Recorrido de Tarjetas',
+    random_label: 'Aleatorio:',
+    spaced_rep_label: 'Rep. Espaciada:',
+    on: 'Sí',
+    off: 'No',
+    spaced_rep_tip: '🎓 Prioriza las tarjetas marcadas como Difícil y las no calificadas sobre las de nivel Fácil basadas en tu historial.',
+    phrase: 'Frase',
+    of: 'de',
+    mastered: 'Dominadas',
+    video_section: 'Sección del Video:',
+    status_spaced_rep: 'Activo: Rep. Espaciada',
+    status_random: 'Activo: Orden Aleatorio',
+    status_sequential: 'Activo: Secuencial',
+    study_tip_title: 'CONSEJO DE ESTUDIO ACTIVO:',
+    study_tip_observe: 'Observa cómo el hablante pronuncia',
+    study_tip_translates: 'Esto se traduce como',
+    study_tip_breakdown: 'Desglose de palabras clave:',
+    study_tip_practice: '¡Practica vocalizando esto sincronizado con el video!',
+    linguistic_breakdown: 'Linguistic Sentence Breakdown',
+    start_trim: 'Ajustar Inicio',
+    start_time: 'Tiempo de inicio:',
+    end_trim: 'Ajustar Fin (Auto-Stop)',
+    end_time: 'Tiempo de fin:',
+    estimated: '(Estimado)',
+    stop_video_after: 'Detener video tras frase:',
+    enabled: 'Habilitado',
+    disabled: 'Deshabilitado',
+    card_study_notes: 'Notas de la Tarjeta',
+    my_study_notes: 'Mis Notas (Reverso de Tarjeta)',
+    add_notes_placeholder: 'Añade tus notas sobre pronunciación, inflexiones, jerga, gramática o recordatorios aquí...',
+    media_hub: 'Centro de Medios',
+    youtube_video: 'Video de YouTube',
+    local_file: 'Archivo Local',
+    video_playback_mode: 'Modo de Reproducción:',
+    stop_after_phrase: 'Detener tras frase',
+    continuous_play: 'Reproducción continua',
+    lesson_title_prefix: 'Lección:',
+    original_video: 'Video Original',
+    practicing_timestamps_info: 'Practicar marcas de tiempo buscará automáticamente el flujo del video. También puedes pausar/reproducir manualmente con los controles de Youtube.',
+    file_label: 'Archivo:',
+    remove_file: 'Eliminar archivo',
+    drag_drop_prefix: 'Arrastra y suelta',
+    drag_drop_suffix: ' el archivo multimedia aquí',
+    or_browse: 'o navega por tus archivos de sistema',
+    browse_files: 'Buscar Archivos',
+    how_offline_works: 'Cómo funciona el modo offline:',
+    how_offline_desc_prefix: 'Al descargar',
+    how_offline_desc_suffix: ' el video/audio de la lección de manera local y cargarlo aquí, tendrás precisión sin retrasos. Tu navegador procesa todo localmente; nada sale de tu dispositivo.',
+    quick_jump: 'Secciones de Salto Rápido:',
+    delete_lesson_title: '¿Eliminar lección permanentemente?',
+    delete_lesson_desc: 'Estás a punto de eliminar permanentemente',
+    delete_lesson_warning: 'Advertencia: Esto eliminará las frases, tarjetas, términos de vocabulario y archivos de sincronización de esta lección tanto de la nube de Firestore como de tu almacenamiento local. Esta acción es definitiva y no se puede deshacer.',
+    delete_lesson_confirm_prompt: 'Escribe ELIMINAR a continuación para confirmar:',
+    delete_word_target: 'ELIMINAR',
+    delete_word_placeholder: 'Escribe ELIMINAR...',
+    cancel: 'Cancelar',
+    delete_action: 'Eliminar permanentemente',
   },
   fr: {
     flashcards: 'Fiches',
     quiz: 'Défi Quiz',
     dictation: "Arène d'Épellation",
-    vocab: 'Vocabulaire',
-    lyrics: 'Paroles',
-    change_import: 'Changer / Importer',
+    vocab: 'Vocabulaire de leçon',
+    lyrics: 'Lignes de vidéo',
+    change_import: 'Changer / Importer une leçon',
     prev: 'Précédent',
     next: 'Suivant',
     reveal_translation: 'Révéler la traduction',
@@ -357,11 +477,11 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     current_card_timestamp: 'Horodatage de la carte :',
     trim_time: 'Ajuster le temps',
     reset_to_default: 'Réinitialiser',
-    load_demo_song: 'Charger la démo',
-    create_blank_song: 'Créer une chanson vide',
-    song_customizer_title: 'Personnalisation de chanson',
-    song_library_title: 'Votre bibliothèque',
-    lyrics_instruction: "Cliquez sur Play pour synchroniser l'horodatage de cette ligne.",
+    load_demo_song: 'Charger la leçon démo',
+    create_blank_song: 'Créer une leçon vide',
+    song_customizer_title: 'Personnalisation de leçon',
+    song_library_title: 'Votre bibliothèque de leçons',
+    lyrics_instruction: "Cliquez sur le bouton de lecture d'une ligne pour synchroniser le lecteur vidéo et le lecteur local avec l'horodatage précis.",
     back_card: 'Verso',
     front_card: 'Recto',
     check_answer: 'Vérifier la réponse',
@@ -376,15 +496,76 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     next_phrase: 'Phrase suivante',
     settings: 'Paramètres',
     language: 'Langue de l\'app',
-    click_to_reveal: 'Cliquer pour révéler la traduction'
+    click_to_reveal: 'Cliquer pour révéler la traduction',
+    self_assess: 'Évaluez votre confiance pour cette phrase :',
+    hard: 'Difficile / Revoir',
+    medium: 'Moyen',
+    easy: 'Facile / Maîtrisé',
+    card_traversal_mode: 'Mode de défilement des fiches',
+    random_label: 'Aléatoire :',
+    spaced_rep_label: 'Rép. espacée :',
+    on: 'Actif',
+    off: 'Inactif',
+    spaced_rep_tip: '🎓 Donne la priorité aux cartes marquées Difficile et non notées sur les cartes Facile selon votre historique.',
+    phrase: 'Phrase',
+    of: 'sur',
+    mastered: 'Maîtrisées',
+    video_section: 'Section vidéo :',
+    status_spaced_rep: 'Actif : Rép. espacée',
+    status_random: 'Actif : Mélange aléatoire',
+    status_sequential: 'Actif : Séquentiel',
+    study_tip_title: 'CONSEIL D\'ÉTUDE DE LA LEÇON :',
+    study_tip_observe: 'Observez comment l\'interlocuteur énonce',
+    study_tip_translates: 'Cela se traduit par',
+    study_tip_breakdown: 'Analyse des mots clés :',
+    study_tip_practice: 'Entraînez-vous à prononcer cela en synchronisation avec la vidéo !',
+    linguistic_breakdown: 'Analyse linguistique de la phrase',
+    start_trim: 'Début de l\'ajustement',
+    start_time: 'Heure de début :',
+    end_trim: 'Fin de l\'ajustement (Cible d\'arrêt auto)',
+    end_time: 'Heure de fin :',
+    estimated: '(Estimé)',
+    stop_video_after: 'Arrêter la vidéo après la phrase :',
+    enabled: 'Activé',
+    disabled: 'Désactivé',
+    card_study_notes: 'Notes d\'étude de la fiche',
+    my_study_notes: 'Mes notes d\'étude (Affiche au verso)',
+    add_notes_placeholder: 'Ajoutez vos notes sur la prononciation, les inflexions, l\'argot, la grammaire ou des rappels ici...',
+    media_hub: 'Centre multimédia',
+    youtube_video: 'Vidéo YouTube',
+    local_file: 'Fichier local',
+    video_playback_mode: 'Mode de lecture vidéo :',
+    stop_after_phrase: 'Arrêter après la phrase',
+    continuous_play: 'Lecture continue',
+    lesson_title_prefix: 'Leçon :',
+    original_video: 'Vidéo originale',
+    practicing_timestamps_info: 'S\'entraîner avec les horodatages positionnera automatiquement la vidéo. Vous pouvez également utiliser manuellement les commandes YouTube standard.',
+    file_label: 'Fichier :',
+    remove_file: 'Supprimer le fichier',
+    drag_drop_prefix: 'Glisser-déposer',
+    drag_drop_suffix: ' le fichier multimédia ici',
+    or_browse: 'ou parcourez vos fichiers système',
+    browse_files: 'Parcourir les fichiers',
+    how_offline_works: 'Fonctionnement du mode local hors ligne :',
+    how_offline_desc_prefix: 'En téléchargeant',
+    how_offline_desc_suffix: ' la vidéo/l\'audio de la leçon localement et en l\'important ici, vous obtenez une précision sans décalage. Votre navigateur gère cela localement ; rien ne quitte votre machine.',
+    quick_jump: 'Sections de saut rapide :',
+    delete_lesson_title: 'Supprimer définitivement la leçon ?',
+    delete_lesson_desc: 'Vous êtes sur le point de supprimer définitivement',
+    delete_lesson_warning: "Attention : Cela supprimera les phrases, fiches, termes de vocabulaire et fichiers de synchronisation de cette leçon à la fois du cloud Firestore et de votre stockage local. Cette action est définitive et ne peut pas être annulée.",
+    delete_lesson_confirm_prompt: 'Saisissez SUPPRIMER ci-dessous pour confirmer :',
+    delete_word_target: 'SUPPRIMER',
+    delete_word_placeholder: 'Saisir SUPPRIMER...',
+    cancel: 'Annuler',
+    delete_action: 'Supprimer définitivement',
   },
   de: {
     flashcards: 'Karteikarten',
     quiz: 'Quiz-Herausforderung',
     dictation: 'Rechtschreib-Arena',
-    vocab: 'Song-Vokabeln',
-    lyrics: 'Songtext',
-    change_import: 'Lied wechseln / importieren',
+    vocab: 'Lektionsvokabeln',
+    lyrics: 'Video-Zeilen',
+    change_import: 'Lektion wechseln / importieren',
     prev: 'Zurück',
     next: 'Weiter',
     reveal_translation: 'Übersetzung anzeigen',
@@ -392,11 +573,11 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     current_card_timestamp: 'Zeitstempel der Karte:',
     trim_time: 'Zeit anpassen',
     reset_to_default: 'Zurücksetzen',
-    load_demo_song: 'Demo-Lied laden',
-    create_blank_song: 'Leeres Lied erstellen',
-    song_customizer_title: 'Song-Customizer & Loader',
-    song_library_title: 'Deine Liederbibliothek',
-    lyrics_instruction: 'Klicke auf Abspielen, um mit dem genauen Zeitstempel dieser Zeile zu synchronisieren.',
+    load_demo_song: 'Demo-Lektion laden',
+    create_blank_song: 'Leere Lektion erstellen',
+    song_customizer_title: 'Lektions-Customizer & Loader',
+    song_library_title: 'Deine Lektionsbibliothek',
+    lyrics_instruction: 'Klicke auf die Abspieltaste einer Zeile, um den Videoplayer und den lokalen Player direkt mit dem genauen Zeitstempel dieser Zeile zu synchronisieren.',
     back_card: 'Rückseite',
     front_card: 'Vorderseite',
     check_answer: 'Antwort prüfen',
@@ -411,15 +592,76 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     next_phrase: 'Nächste Phrase',
     settings: 'Einstellungen',
     language: 'App-Sprache',
-    click_to_reveal: 'Klicken für Übersetzung'
+    click_to_reveal: 'Klicken für Übersetzung',
+    self_assess: 'Schätze dein Vertrauen in diese Phrase selbst ein:',
+    hard: 'Schwer / Noch einmal',
+    medium: 'Mittel',
+    easy: 'Einfach / Gelernt',
+    card_traversal_mode: 'Kartendurchlauf-Modus',
+    random_label: 'Zufall:',
+    spaced_rep_label: 'Spaced Rep:',
+    on: 'An',
+    off: 'Aus',
+    spaced_rep_tip: '🎓 Bevorzugt Karten, die als Schwer markiert oder noch nicht bewertet sind, gegenüber Einfachen Karten.',
+    phrase: 'Phrase',
+    of: 'von',
+    mastered: 'Gelernt',
+    video_section: 'Videoabschnitt:',
+    status_spaced_rep: 'Aktiv: Spaced Rep',
+    status_random: 'Aktiv: Zufallsmischung',
+    status_sequential: 'Aktiv: Sequentiell',
+    study_tip_title: 'AKTIVER LEKTIONS-STUDIENTIPP:',
+    study_tip_observe: 'Beobachte, wie der Sprecher',
+    study_tip_translates: 'Dies bedeutet',
+    study_tip_breakdown: 'Schlüsselwörter-Aufschlüsselung:',
+    study_tip_practice: 'Übe, dies synchron mit dem Video zu sprechen!',
+    linguistic_breakdown: 'Linguistische Satzanalyse',
+    start_trim: 'Start anpassen',
+    start_time: 'Startzeit:',
+    end_trim: 'Ende anpassen (Ziel für Auto-Stopp)',
+    end_time: 'Endzeit:',
+    estimated: '(Geschätzt)',
+    stop_video_after: 'Video nach dem Sprechen stoppen:',
+    enabled: 'Aktiviert',
+    disabled: 'Deaktiviert',
+    card_study_notes: 'Karteikarten-Studiennotizen',
+    my_study_notes: 'Meine Studiennotizen (Erscheint auf der Rückseite)',
+    add_notes_placeholder: 'Füge hier deine Notizen zu Aussprache, Betonung, Umgangssprache, Grammatik oder Erinnerungen hinzu...',
+    media_hub: 'Medienzentrum',
+    youtube_video: 'YouTube-Video',
+    local_file: 'Lokale Datei',
+    video_playback_mode: 'Video-Wiedergabemodus:',
+    stop_after_phrase: 'Nach Phrase stoppen',
+    continuous_play: 'Kontinuierliche Wiedergabe',
+    lesson_title_prefix: 'Lektion:',
+    original_video: 'Originalvideo',
+    practicing_timestamps_info: 'Das Üben von Zeitstempeln sucht automatisch den Videostream. Du kannst die Standard-Youtube-Steuerelemente auch manuell pausieren/abspielen.',
+    file_label: 'Datei:',
+    remove_file: 'Datei entfernen',
+    drag_drop_prefix: 'Zieh & lass',
+    drag_drop_suffix: 's Mediendatei hierher',
+    or_browse: 'oder durchsuche deine Systemdateien',
+    browse_files: 'Dateien durchsuchen',
+    how_offline_works: 'So funktioniert der Offline-Lokalmodus:',
+    how_offline_desc_prefix: 'Indem du',
+    how_offline_desc_suffix: 's Lektions-Video/Audio lokal herunterlädst und hier hochlädst, erhältst du eine verzögerungsfreie, exakte Suchgenauigkeit. Dein Browser verarbeitet dies vollständig lokal; nichts von dem, was hochgeladen wurde, verlässt deinen Rechner.',
+    quick_jump: 'Schnellsprung-Abschnitte:',
+    delete_lesson_title: 'Lektion dauerhaft löschen?',
+    delete_lesson_desc: 'Du bist im Begriff, Folgendes dauerhaft zu löschen:',
+    delete_lesson_warning: 'Warnung: Dies löscht die Sätze, Karteikarten, Vokabeln und Synchronisierungsdateien dieser Lektion sowohl aus der Firestore Cloud als auch aus deinem lokalen Speicher. Diese Aktion ist endgültig und kann nicht rückgängig gemacht werden.',
+    delete_lesson_confirm_prompt: 'Gib LOESCHEN unten ein, um zu bestätigen:',
+    delete_word_target: 'LOESCHEN',
+    delete_word_placeholder: 'Gib LOESCHEN ein...',
+    cancel: 'Abbrechen',
+    delete_action: 'Dauerhaft löschen',
   },
   it: {
     flashcards: 'Carte',
     quiz: 'Sfida Quiz',
     dictation: 'Arena di Scrittura',
-    vocab: 'Vocabolario',
-    lyrics: 'Testo',
-    change_import: 'Cambia / Importa Canzone',
+    vocab: 'Vocabolario Lezione',
+    lyrics: 'Linee del Video',
+    change_import: 'Cambia / Importa Lezione',
     prev: 'Precedente',
     next: 'Successivo',
     reveal_translation: 'Rivela Traduzione',
@@ -427,11 +669,11 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     current_card_timestamp: 'Timestamp della carta:',
     trim_time: 'Regola Tempo',
     reset_to_default: 'Ripristina',
-    load_demo_song: 'Carica Canzone Demo',
-    create_blank_song: 'Crea Nuova Canzone Vuota',
-    song_customizer_title: 'Personalizzatore Canzoni',
-    song_library_title: 'La Tua Libreria Canzoni',
-    lyrics_instruction: 'Clicca su Play per saltare al timestamp preciso di questa riga.',
+    load_demo_song: 'Carica Lezione Demo',
+    create_blank_song: 'Crea Nuova Lezione Vuota',
+    song_customizer_title: 'Personalizzatore Lezioni',
+    song_library_title: 'La Tua Libreria Lezioni',
+    lyrics_instruction: 'Clicca sul pulsante Play di qualsiasi riga per sincronizzare e saltare al timestamp preciso di quella linea.',
     back_card: 'Retro',
     front_card: 'Fronte',
     check_answer: 'Verifica Risposta',
@@ -446,15 +688,76 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     next_phrase: 'Prossima Frase',
     settings: 'Impostazioni',
     language: 'Lingua App',
-    click_to_reveal: 'Clicca per rivelare la traduzione'
+    click_to_reveal: 'Clicca per rivelare la traduzione',
+    self_assess: 'Valuta il tuo livello di sicurezza per questa frase:',
+    hard: 'Difficile / Ripeti',
+    medium: 'Medio',
+    easy: 'Facile / Appreso',
+    card_traversal_mode: 'Modalità di Scorrimento Carte',
+    random_label: 'Casuale:',
+    spaced_rep_label: 'Rip. Spaziata:',
+    on: 'Attivo',
+    off: 'Disattivato',
+    spaced_rep_tip: '🎓 Dà la priorità alle carte contrassegnate come Difficile e non valutate rispetto a quelle Facile in base alla tua cronologia.',
+    phrase: 'Frase',
+    of: 'di',
+    mastered: 'Imparate',
+    video_section: 'Sezione Video:',
+    status_spaced_rep: 'Attivo: Rip. Spaziata',
+    status_random: 'Attivo: Casuale',
+    status_sequential: 'Attivo: Sequenziale',
+    study_tip_title: 'CONSIGLIO DI STUDIO ATTIVO:',
+    study_tip_observe: 'Osserva come il parlante pronuncia',
+    study_tip_translates: 'Questo si traduce in',
+    study_tip_breakdown: 'Analisi delle parole chiave:',
+    study_tip_practice: 'Esercitati a vocalizzare in sincronia con il video!',
+    linguistic_breakdown: 'Analisi Linguistica della Frase',
+    start_trim: 'Regola Inizio',
+    start_time: 'Tempo di inizio:',
+    end_trim: 'Regola Fine (Target Stop Auto)',
+    end_time: 'Tempo di fine:',
+    estimated: '(Stimato)',
+    stop_video_after: 'Interrompi video dopo la frase:',
+    enabled: 'Abilitato',
+    disabled: 'Disattivato',
+    card_study_notes: 'Note di Studio della Carta',
+    my_study_notes: 'Le Mie Note (Retro della Carta)',
+    add_notes_placeholder: 'Aggiungi qui le tue note su pronuncia, inflessioni, slang, spiegazioni grammaticali o promemoria...',
+    media_hub: 'Centro Media',
+    youtube_video: 'Video YouTube',
+    local_file: 'File Locale',
+    video_playback_mode: 'Modalità Riproduzione Video:',
+    stop_after_phrase: 'Interrompi dopo frase',
+    continuous_play: 'Riproduzione continua',
+    lesson_title_prefix: 'Lezione:',
+    original_video: 'Video Originale',
+    practicing_timestamps_info: 'Esercitarsi con i timestamp sposterà automaticamente il video. Puoi anche gestire manualmente i controlli standard di YouTube.',
+    file_label: 'File:',
+    remove_file: 'Rimuovi file',
+    drag_drop_prefix: 'Trascina e rilascia',
+    drag_drop_suffix: ' il file multimediale qui',
+    or_browse: 'o sfoglia i file di sistema',
+    browse_files: 'Sfoglia File',
+    how_offline_works: 'Come funziona la modalità locale offline:',
+    how_offline_desc_prefix: 'Scaricando',
+    how_offline_desc_suffix: ' il video/audio della lezione localmente e caricandolo qui, otterrai una precisione millimetrica senza ritardi. Il tuo browser gestisce tutto localmente; nessun file lascia il tuo computer.',
+    quick_jump: 'Sezioni Salto Rapido:',
+    delete_lesson_title: 'Eliminare permanentemente la lezione?',
+    delete_lesson_desc: 'Stai per eliminare permanentemente',
+    delete_lesson_warning: 'Attenzione: Questo eliminerà le frasi, le carte, i termini di vocabolario e i file di sincronizzazione di questa lezione sia da Firestore Cloud che dalla memoria locale. Questa azione è definitiva e non può essere annullata.',
+    delete_lesson_confirm_prompt: 'Digita ELIMINA qui sotto per confermare:',
+    delete_word_target: 'ELIMINA',
+    delete_word_placeholder: 'Digita ELIMINA...',
+    cancel: 'Annulla',
+    delete_action: 'Elimina permanentemente',
   },
   pt: {
     flashcards: 'Cartões',
     quiz: 'Desafio de Quiz',
     dictation: 'Arena de Ortografia',
-    vocab: 'Vocabulário',
-    lyrics: 'Letras',
-    change_import: 'Alterar / Importar Música',
+    vocab: 'Vocabulário da Lição',
+    lyrics: 'Linhas do Vídeo',
+    change_import: 'Alterar / Importar Lição',
     prev: 'Anterior',
     next: 'Seguinte',
     reveal_translation: 'Revelar Tradução',
@@ -462,11 +765,11 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     current_card_timestamp: 'Timestamp do cartão:',
     trim_time: 'Ajustar Tempo',
     reset_to_default: 'Restaurar Padrão',
-    load_demo_song: 'Carregar Música Demo',
-    create_blank_song: 'Criar Nova Música Vazia',
-    song_customizer_title: 'Personalizador de Músicas',
-    song_library_title: 'Sua Biblioteca de Músicas Salvas',
-    lyrics_instruction: 'Clique no botão Play de qualquer letra para sincronizar e saltar para o timestamp dessa linha.',
+    load_demo_song: 'Carregar Lição Demo',
+    create_blank_song: 'Criar Nova Lição Vazia',
+    song_customizer_title: 'Personalizador de Lições',
+    song_library_title: 'Sua Biblioteca de Lições Salvas',
+    lyrics_instruction: 'Clique no botão Play de qualquer linha para sincronizar e saltar para o timestamp dessa linha.',
     back_card: 'Reverso',
     front_card: 'Frente',
     check_answer: 'Verificar Resposta',
@@ -481,7 +784,68 @@ const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
     next_phrase: 'Próxima Frase',
     settings: 'Configurações',
     language: 'Idioma do App',
-    click_to_reveal: 'Clique para revelar tradução'
+    click_to_reveal: 'Clique para revelar tradução',
+    self_assess: 'Avalie sua confiança para esta frase:',
+    hard: 'Difícil / Repetir',
+    medium: 'Médio',
+    easy: 'Fácil / Dominado',
+    card_traversal_mode: 'Modo de Navegação de Cartões',
+    random_label: 'Aleatório:',
+    spaced_rep_label: 'Rep. Espaçada:',
+    on: 'Ativo',
+    off: 'Inativo',
+    spaced_rep_tip: '🎓 Prioriza cartões classificados como Difícil e não classificados em relação aos cartões Fácil.',
+    phrase: 'Frase',
+    of: 'de',
+    mastered: 'Dominados',
+    video_section: 'Seção do Vídeo:',
+    status_spaced_rep: 'Ativo: Rep. Espaçada',
+    status_random: 'Ativo: Embaralhar',
+    status_sequential: 'Ativo: Sequencial',
+    study_tip_title: 'DICA DE ESTUDO ATIVO DA LIÇÃO:',
+    study_tip_observe: 'Observe como o falante pronuncia',
+    study_tip_translates: 'Isso se traduz em',
+    study_tip_breakdown: 'Análise de palavras-chave:',
+    study_tip_practice: 'Pratique a vocalização em sincronia com o vídeo!',
+    linguistic_breakdown: 'Análise Linguística da Frase',
+    start_trim: 'Ajustar Início',
+    start_time: 'Tempo de início:',
+    end_trim: 'Ajustar Fim (Alvo de Parada Automática)',
+    end_time: 'Tempo de fim:',
+    estimated: '(Estimado)',
+    stop_video_after: 'Parar o vídeo após dizer a frase:',
+    enabled: 'Ativado',
+    disabled: 'Desativado',
+    card_study_notes: 'Notas de Estudo do Cartão',
+    my_study_notes: 'Minhas Notas (Verso do Cartão)',
+    add_notes_placeholder: 'Adicione suas notas sobre pronúncia, inflexões, gírias, gramática ou lembretes aqui...',
+    media_hub: 'Central de Mídia',
+    youtube_video: 'Vídeo do YouTube',
+    local_file: 'Arquivo Local',
+    video_playback_mode: 'Modo de Reprodução de Vídeo:',
+    stop_after_phrase: 'Parar após frase',
+    continuous_play: 'Reprodução contínua',
+    lesson_title_prefix: 'Lição:',
+    original_video: 'Vídeo Original',
+    practicing_timestamps_info: 'Praticar marcações de tempo buscará automaticamente o fluxo do vídeo. Você também pode pausar/reprodurir manualmente os controles padrão do YouTube.',
+    file_label: 'Arquivo:',
+    remove_file: 'Remover arquivo',
+    drag_drop_prefix: 'Arraste e solte',
+    drag_drop_suffix: ' o arquivo de mídia aqui',
+    or_browse: 'ou navegue pelos seus arquivos do sistema',
+    browse_files: 'Procurar Arquivos',
+    how_offline_works: 'Como funciona o modo local offline:',
+    how_offline_desc_prefix: 'Ao baixar',
+    how_offline_desc_suffix: ' o vídeo/áudio da lição localmente e enviando-o aqui, você terá uma precisão de busca exata e sem atrasos. Seu navegador lida com isso de forma totalmente local; nada enviado sai de sua máquina.',
+    quick_jump: 'Seções de Salto Rápido:',
+    delete_lesson_title: 'Excluir lição permanentemente?',
+    delete_lesson_desc: 'Você está prestes a excluir permanentemente',
+    delete_lesson_warning: 'Aviso: Isso excluirá as frases, cartões, termos de vocabulário e arquivos de sincronização desta lição tanto da nuvem Firestore quanto do seu armazenamento local. Esta ação é definitiva e não pode ser desfeita.',
+    delete_lesson_confirm_prompt: 'Digite EXCLUIR abaixo para confirmar:',
+    delete_word_target: 'EXCLUIR',
+    delete_word_placeholder: 'Digite EXCLUIR...',
+    cancel: 'Cancelar',
+    delete_action: 'Excluir permanentemente',
   }
 };
 
@@ -616,6 +980,21 @@ export default function App() {
     }
   };
 
+  // Cloud helper to delete a song from Firestore
+  const deleteSongFromCloud = async (song: SongData) => {
+    const songId = `${song.title.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}_${song.artist.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+    try {
+      setCloudSyncStatus('syncing');
+      const songDocRef = doc(db, 'songs', songId);
+      await deleteDoc(songDocRef);
+      setCloudSyncStatus('synced');
+    } catch (e) {
+      console.error("Failed to delete song from Firestore:", e);
+      setCloudSyncStatus('error');
+      handleFirestoreError(e, 'songs', 'delete', `songs/${songId}`);
+    }
+  };
+
   // Cloud helper to save buddy study notes to Firestore
   const saveNoteToCloud = async (phraseId: number, partnerA?: string, partnerB?: string) => {
     const noteId = `note_${phraseId}`;
@@ -655,27 +1034,17 @@ export default function App() {
         });
       });
 
-      if (cloudSongs.length > 0) {
-        setSavedSongs((prev) => {
-          const merged = [...prev];
-          cloudSongs.forEach((cloudSong) => {
-            const index = merged.findIndex(
-              (s) => s.title.toLowerCase().trim() === cloudSong.title.toLowerCase().trim() &&
-                     s.artist.toLowerCase().trim() === cloudSong.artist.toLowerCase().trim()
-            );
-            if (index !== -1) {
-              // Only overwrite if different to avoid redundant loops
-              if (JSON.stringify(merged[index]) !== JSON.stringify(cloudSong)) {
-                merged[index] = cloudSong;
-              }
-            } else {
-              merged.push(cloudSong);
-            }
-          });
-          localStorage.setItem('confieso_song_library', JSON.stringify(merged));
-          return merged;
-        });
-      }
+      // Reconstruct the saved songs list: always start with default SONG_DATA, then add all others from cloud
+      const updatedList = [SONG_DATA];
+      cloudSongs.forEach((cloudSong) => {
+        const isDefault = cloudSong.title.toLowerCase().trim() === SONG_DATA.title.toLowerCase().trim() &&
+                          cloudSong.artist.toLowerCase().trim() === SONG_DATA.artist.toLowerCase().trim();
+        if (!isDefault) {
+          updatedList.push(cloudSong);
+        }
+      });
+      setSavedSongs(updatedList);
+      localStorage.setItem('confieso_song_library', JSON.stringify(updatedList));
       setCloudSyncStatus('synced');
     }, (error) => {
       console.error("Firestore songs sync error:", error);
@@ -740,6 +1109,8 @@ export default function App() {
   }, [songData]);
 
   const [showSongManager, setShowSongManager] = useState<boolean>(false);
+  const [songToDelete, setSongToDelete] = useState<SongData | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState<string>('');
   
   // Buddy Language Swap and Cooperative Learning States
   const [studyRole, setStudyRole] = useState<'spanish-learner' | 'english-learner'>(() => {
@@ -2110,7 +2481,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 >
                   <div className="flex items-center gap-4 w-full lg:w-auto pb-1">
                     <div className="w-12 h-12 bg-teal-500/20 rounded-xl flex items-center justify-center border border-teal-500/30 flex-shrink-0">
-                      <Music className="w-6 h-6 text-teal-400" />
+                      <Film className="w-6 h-6 text-teal-400" />
                     </div>
                     <div>
                       <h1 id="app-title" className="text-xl sm:text-2xl font-bold tracking-tight text-white">
@@ -2124,7 +2495,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                           onClick={() => setShowSongManager(!showSongManager)}
                           className="text-xs text-indigo-400 hover:text-indigo-300 font-bold underline decoration-dotted underline-offset-2 flex items-center gap-1 cursor-pointer transition-colors"
                         >
-                          <Music className="w-3 h-3" />
+                          <Film className="w-3 h-3" />
                           <span>{t('change_import')}</span>
                         </button>
                         <span className="text-slate-800">•</span>
@@ -2159,7 +2530,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   { id: 'quiz', label: t('quiz'), icon: HelpCircle },
                   { id: 'dictation', label: t('dictation'), icon: Keyboard },
                   { id: 'vocab', label: t('vocab'), icon: Sparkle },
-                  { id: 'lyrics', label: t('lyrics'), icon: Headphones },
+                  { id: 'lyrics', label: t('lyrics'), icon: Film },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   return (
@@ -2285,10 +2656,10 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-3">
                 <div>
                   <h3 className="text-base font-bold text-teal-300 flex items-center gap-2">
-                    <Music className="w-5 h-5" /> {t('song_customizer_title')}
+                    <Film className="w-5 h-5" /> {t('song_customizer_title')}
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Turn this application into an immersive study companion for any song in the world. Just fetch song metadata from Gemini and load it below!
+                    Turn this application into an immersive study companion for any video lesson in the world. Just fetch lesson metadata from Gemini and load it below!
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -2326,7 +2697,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       <FolderHeart className="w-4.5 h-4.5 text-pink-500" /> {t('song_library_title')}
                     </h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Toggle between different songs you have imported. Any changes or timestamp trims you make are saved automatically to your local browser storage.
+                      Toggle between different lessons you have imported. Any changes or timestamp trims you make are saved automatically to your local browser storage.
                     </p>
                   </div>
                   <button
@@ -2406,7 +2777,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-850/60">
                           {isActive ? (
                             <span className="text-[11px] font-extrabold text-teal-400 uppercase tracking-wider flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5 animate-pulse" /> Current Song
+                              <CheckCircle2 className="w-3.5 h-3.5 animate-pulse" /> Current Lesson
                             </span>
                           ) : (
                             <button
@@ -2417,27 +2788,15 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                               }}
                               className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] sm:text-[11px] px-3 py-1 rounded-lg transition active:scale-95 flex items-center gap-1 cursor-pointer"
                             >
-                              Load Song
+                              Load Lesson
                             </button>
                           )}
 
                           {!isDefault && (
                             <button
                               onClick={() => {
-                                const confirmed = window.confirm(`Are you sure you want to delete "${song.title}" from your library?`);
-                                if (confirmed) {
-                                  setSavedSongs((prev) => {
-                                    const updated = prev.filter(
-                                      (s) => !(s.title === song.title && s.artist === song.artist)
-                                    );
-                                    localStorage.setItem('confieso_song_library', JSON.stringify(updated));
-                                    if (isActive) {
-                                      setSongData(SONG_DATA);
-                                      localStorage.setItem('confieso_custom_song', JSON.stringify(SONG_DATA));
-                                    }
-                                    return updated;
-                                  });
-                                }
+                                setSongToDelete(song);
+                                setDeleteConfirmText('');
                               }}
                               className="text-rose-400 hover:text-rose-350 p-1 rounded-lg hover:bg-rose-950/20 transition cursor-pointer"
                               title="Delete from library"
@@ -2541,10 +2900,10 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                          <label className="text-[10px] text-slate-400 block mb-1">Song Name & Artist:</label>
+                          <label className="text-[10px] text-slate-400 block mb-1">Lesson Topic & Speaker:</label>
                           <input
                             type="text"
-                            placeholder="e.g. La Camisa Negra by Juanes"
+                            placeholder="e.g. Conversational Spanish Lesson by Instructor"
                             value={promptSongName}
                             onChange={(e) => setPromptSongName(e.target.value)}
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 focus:border-indigo-500 outline-none placeholder:text-slate-600"
@@ -2683,14 +3042,14 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
                   {/* Current Active Metadata summary card */}
                   <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850/60 space-y-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Song Metadata:</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Lesson Metadata:</span>
                     <div className="grid grid-cols-2 gap-4 text-xs pt-1">
                       <div>
-                        <span className="text-slate-500 block">Song Title</span>
+                        <span className="text-slate-500 block">Lesson Title</span>
                         <strong className="text-slate-200">{songData.title}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 block">Artist</span>
+                        <span className="text-slate-500 block">Speaker / Instructor</span>
                         <strong className="text-slate-200">{songData.artist}</strong>
                       </div>
                       <div>
@@ -3017,7 +3376,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               <h3 className="text-lg font-bold text-slate-300">This study deck is empty</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
                 {selectedDecks.includes('Starred') 
-                  ? "Mark key song phrases with the Star icon while studying flashcards to collect them in your personalized review deck!" 
+                  ? "Mark key lesson phrases with the Star icon while studying flashcards to collect them in your personalized review deck!" 
                   : "No items match your active filters. Try resetting to access the full catalog."}
               </p>
               <button 
@@ -3043,14 +3402,14 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   {/* Progress Metrics bar */}
                   <div className="flex items-center justify-between text-xs text-slate-400 px-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-teal-400">Phrase {cardIndex + 1} of {filteredPhrases.length}</span>
+                      <span className="font-semibold text-teal-400">{t('phrase')} {cardIndex + 1} {t('of')} {filteredPhrases.length}</span>
                       <span className="text-slate-700">•</span>
                       <span className="text-slate-300 font-medium">{activePhrase.category}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="flex items-center gap-1.5 text-emerald-400">
                         <CheckCircle2 className="w-3.5 h-3.5" /> 
-                        {Object.values(knownRates).filter(r => r === 'easy').length} Mastered
+                        {Object.values(knownRates).filter(r => r === 'easy').length} {t('mastered')}
                       </span>
                     </div>
                   </div>
@@ -3242,7 +3601,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         </div>
 
                         <div className="flex justify-between items-center border-t border-slate-800/60 pt-4 text-xs text-slate-500">
-                          <span className="font-semibold text-slate-400">Song Section: {activePhrase.timestampStr}</span>
+                          <span className="font-semibold text-slate-400">{t('video_section')} {activePhrase.timestampStr}</span>
                           <span className="text-[10px] uppercase font-bold text-slate-600">{t('back_card')}</span>
                         </div>
                       </div>
@@ -3252,7 +3611,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
                   {/* SPACED REPETITION CONFIDENCE TRACKER */}
                   <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-                    <p className="text-xs text-slate-400 text-center font-bold mb-3 uppercase tracking-wider">Self-Assess your confidence for this phrase:</p>
+                    <p className="text-xs text-slate-400 text-center font-bold mb-3 uppercase tracking-wider">{t('self_assess')}</p>
                     <div className="grid grid-cols-3 gap-3">
                       <button 
                         id="grade-hard-btn"
@@ -3264,7 +3623,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         }`}
                       >
                         <AlertCircle className="w-4 h-4 text-rose-400" />
-                        <span>Hard / Again</span>
+                        <span>{t('hard')}</span>
                       </button>
                       <button 
                         id="grade-medium-btn"
@@ -3276,7 +3635,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         }`}
                       >
                         <HelpCircle className="w-4 h-4 text-amber-400" />
-                        <span>Medium</span>
+                        <span>{t('medium')}</span>
                       </button>
                       <button 
                         id="grade-easy-btn"
@@ -3288,7 +3647,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         }`}
                       >
                         <Check className="w-4 h-4 text-emerald-400" />
-                        <span>Easy / Mastered</span>
+                        <span>{t('easy')}</span>
                       </button>
                     </div>
                   </div>
@@ -3296,9 +3655,9 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   {/* STUDY MODES / SRS / RANDOM CONFIG */}
                   <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Card Traversal Mode</span>
+                      <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">{t('card_traversal_mode')}</span>
                       <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">
-                        {isSpacedRepOn ? 'Active: Spaced Rep' : isRandomCardOn ? 'Active: Random Shuffle' : 'Active: Sequential'}
+                        {isSpacedRepOn ? t('status_spaced_rep') : isRandomCardOn ? t('status_random') : t('status_sequential')}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -3319,7 +3678,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         title="When enabled, cards will appear in a random order"
                       >
                         <Shuffle className={`w-3.5 h-3.5 ${isRandomCardOn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`} />
-                        <span>Random: {isRandomCardOn ? 'On' : 'Off'}</span>
+                        <span>{t('random_label')} {isRandomCardOn ? t('on') : t('off')}</span>
                       </button>
 
                       {/* Spaced Repetition Toggle */}
@@ -3339,12 +3698,12 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         title="Intelligent spaced repetition system that schedules difficult and unrated phrases more frequently"
                       >
                         <Layers className={`w-3.5 h-3.5 ${isSpacedRepOn ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
-                        <span>Spaced Rep: {isSpacedRepOn ? 'On' : 'Off'}</span>
+                        <span>{t('spaced_rep_label')} {isSpacedRepOn ? t('on') : t('off')}</span>
                       </button>
                     </div>
                     {isSpacedRepOn && (
                       <p className="text-[10px] text-slate-400 text-center leading-normal italic">
-                        🎓 Prioritizes cards rated <span className="text-rose-400 font-bold">Hard</span> & unrated cards over <span className="text-emerald-400 font-bold">Easy</span> cards based on your historical answers.
+                        {t('spaced_rep_tip')}
                       </p>
                     )}
                   </div>
@@ -3383,7 +3742,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 space-y-4">
                     <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-2">
                       <BookOpen className="w-4 h-4 text-teal-400" />
-                      Linguistic Sentence Breakdown
+                      {t('linguistic_breakdown')}
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {activePhrase.breakdown.map((item, idx) => (
@@ -3710,7 +4069,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   className="space-y-4"
                 >
                   <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-bold uppercase tracking-wider">{(songData.vocab || []).length} Core Song Vocab Terms</span>
+                    <span className="text-slate-400 font-bold uppercase tracking-wider">{(songData.vocab || []).length} Core Lesson Vocab Terms</span>
                     <span className="text-teal-400">Mastered by listening & analyzing examples</span>
                   </div>
 
@@ -3745,14 +4104,14 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         <div className="mt-3 text-xs">
                           <p className="text-slate-400 font-medium">Definition: <span className="text-slate-200">{studyRole === 'spanish-learner' ? term.definition : term.word}</span></p>
                           <div className="mt-3 bg-slate-950/70 p-2.5 rounded-lg border border-slate-850">
-                            <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">Used in song:</span>
+                            <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">Used in lesson:</span>
                             <p className="text-slate-300 italic font-medium leading-relaxed">"{term.example}"</p>
                             <button
                               id={`vocab-pronounce-ex-${idx}`}
                               onClick={() => speakText(term.example)}
-                              className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1.5 mt-2 font-semibold"
+                              className="text-[10px] text-teal-400 hover:text-teal-350 flex items-center gap-1.5 mt-2 font-semibold"
                             >
-                              <Volume2 className="w-3 h-3" /> Hear song sentence
+                              <Volume2 className="w-3 h-3" /> Hear lesson sentence
                             </button>
                           </div>
                         </div>
@@ -3772,7 +4131,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   className="space-y-4"
                 >
                   <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
-                    Click any lyric's <strong className="text-teal-400">Play button</strong> to sync and jump both the YouTube player and local player directly to that line's precise timestamp.
+                    Click any line's <strong className="text-teal-400">Play button</strong> to sync and jump both the video player and local player directly to that line's precise timestamp.
                   </div>
 
                   <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
@@ -3906,9 +4265,9 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       {/* Start Time Trim Row */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850/60 w-full">
                         <div className="text-left">
-                          <span className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Start Trim</span>
+                          <span className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">{t('start_trim')}</span>
                           <div className="text-slate-300 font-semibold font-mono text-xs mt-0.5">
-                            Start Time: {activePhrase.timestampStr}
+                            {t('start_time')} {activePhrase.timestampStr}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -3940,9 +4299,9 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       {/* End Time Trim Row */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-850/60 w-full">
                         <div className="text-left">
-                          <span className="text-[10px] text-teal-400 uppercase font-bold tracking-wider">End Trim (Auto-Stop Target)</span>
+                          <span className="text-[10px] text-teal-400 uppercase font-bold tracking-wider">{t('end_trim')}</span>
                           <div className="text-slate-300 font-semibold font-mono text-xs mt-0.5">
-                            End Time: {activePhrase.timestampEndStr || formatTimeSeconds(getPhraseEndTime(activePhrase))} {activePhrase.timestampEnd === undefined && <span className="text-[10px] text-slate-500 font-normal italic">(Estimated)</span>}
+                            {t('end_time')} {activePhrase.timestampEndStr || formatTimeSeconds(getPhraseEndTime(activePhrase))} {activePhrase.timestampEnd === undefined && <span className="text-[10px] text-slate-500 font-normal italic">{t('estimated')}</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -3973,7 +4332,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
                       {/* Playback mode setting in drawer */}
                       <div className="flex items-center justify-between gap-2 bg-slate-950/20 p-2 rounded-xl border border-slate-850/30 w-full">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Stop video after saying phrase:</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('stop_video_after')}</span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -3985,7 +4344,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                               : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
                           }`}
                         >
-                          {autoStopAfterPhrase ? 'Enabled' : 'Disabled'}
+                          {autoStopAfterPhrase ? t('enabled') : t('disabled')}
                         </button>
                       </div>
                     </motion.div>
@@ -3997,19 +4356,19 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-300 border-b border-slate-800 pb-2">
                   <BookOpen className="w-4 h-4 text-teal-400" />
-                  <span>Card Study Notes</span>
+                  <span>{t('card_study_notes')}</span>
                 </div>
                 
                 <div className="space-y-1.5 text-left">
                   <label className="text-[10px] font-extrabold uppercase tracking-wider text-teal-400">
-                    My Study Notes (Appears on Back of Card)
+                    {t('my_study_notes')}
                   </label>
                   <textarea
                     id="phrase-study-notes"
                     rows={3}
                     value={buddyNotes[activePhrase.id]?.partnerA || ''}
                     onChange={(e) => saveBuddyNote(activePhrase.id, 'partnerA', e.target.value)}
-                    placeholder="Add your notes on pronunciation, inflections, slang, grammar explanations, or reminders here..."
+                    placeholder={t('add_notes_placeholder')}
                     className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none leading-relaxed resize-none"
                   />
                 </div>
@@ -4023,7 +4382,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2 text-slate-200">
                 <Film className="w-4.5 h-4.5 text-teal-400" />
-                <h3 className="font-bold text-sm">Media Hub</h3>
+                <h3 className="font-bold text-sm">{t('media_hub')}</h3>
               </div>
 
               {/* Media Stream Switch tabs */}
@@ -4037,7 +4396,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  YouTube Video
+                  {t('youtube_video')}
                 </button>
                 <button
                   id="media-local-tab"
@@ -4048,14 +4407,14 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  Local File
+                  {t('local_file')}
                 </button>
               </div>
             </div>
 
             {/* Playback mode settings */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/40 p-3 rounded-2xl border border-slate-850 text-xs">
-              <span className="text-slate-400 font-medium">Video Playback Mode:</span>
+              <span className="text-slate-400 font-medium">{t('video_playback_mode')}</span>
               <button
                 onClick={() => setAutoStopAfterPhrase(prev => !prev)}
                 className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 border text-[11px] cursor-pointer ${
@@ -4066,11 +4425,11 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
               >
                 {autoStopAfterPhrase ? (
                   <>
-                    <X className="w-3.5 h-3.5 text-rose-400" /> Stop after phrase
+                    <X className="w-3.5 h-3.5 text-rose-400" /> {t('stop_after_phrase')}
                   </>
                 ) : (
                   <>
-                    <Play className="w-3.5 h-3.5 text-emerald-400" /> Continuous play
+                    <Play className="w-3.5 h-3.5 text-emerald-400" /> {t('continuous_play')}
                   </>
                 )}
               </button>
@@ -4089,7 +4448,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-850 space-y-1.5 text-xs text-slate-400">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-300 flex items-center gap-1">
-                      <Music className="w-3.5 h-3.5 text-teal-400" /> Song: "{songData.title}"
+                      <Film className="w-3.5 h-3.5 text-teal-400" /> {t('lesson_title_prefix')} "{songData.title}"
                     </span>
                     <a 
                       href={`https://www.youtube.com/watch?v=${songData.youtubeId}`}
@@ -4097,11 +4456,11 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       rel="noopener noreferrer" 
                       className="text-teal-400 hover:text-teal-300 flex items-center gap-1 text-[10px] uppercase font-bold"
                     >
-                      Original Video <ExternalLink className="w-3 h-3" />
+                      {t('original_video')} <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    Practicing timestamps will automatically seek the video stream. You can also manually pause/play standard Youtube controls.
+                    {t('practicing_timestamps_info')}
                   </p>
                 </div>
               </div>
@@ -4123,7 +4482,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       />
                     </div>
                     <div className="flex items-center justify-between text-xs bg-slate-950 p-2 rounded-lg border border-slate-850">
-                      <span className="text-slate-400 truncate max-w-[200px] font-mono font-medium">File: {localFileName}</span>
+                      <span className="text-slate-400 truncate max-w-[200px] font-mono font-medium">{t('file_label')} {localFileName}</span>
                       <button
                         id="change-local-file"
                         onClick={() => {
@@ -4132,7 +4491,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         }}
                         className="text-[10px] font-bold text-rose-400 hover:text-rose-300 uppercase tracking-wider"
                       >
-                        Remove file
+                        {t('remove_file')}
                       </button>
                     </div>
                   </div>
@@ -4151,11 +4510,11 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                   >
                     <Upload className="w-8 h-8 text-slate-500" />
                     <div>
-                      <p className="text-xs font-bold text-slate-350">Drag & Drop {songData.artist}'s video/audio file here</p>
-                      <p className="text-[10px] text-slate-500 mt-1">or browse your system files</p>
+                      <p className="text-xs font-bold text-slate-350">{t('drag_drop_prefix')} {songData.artist}{t('drag_drop_suffix')}</p>
+                      <p className="text-[10px] text-slate-500 mt-1">{t('or_browse')}</p>
                     </div>
                     <label className="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition">
-                      Browse Files
+                      {t('browse_files')}
                       <input
                         id="local-file-selector"
                         type="file"
@@ -4170,10 +4529,10 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-850 space-y-1.5 text-xs text-slate-400">
                   <div className="flex items-center gap-1.5 font-bold text-slate-300">
                     <Info className="w-4 h-4 text-indigo-400" />
-                    <span>How offline local mode works:</span>
+                    <span>{t('how_offline_works')}</span>
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    By downloading {songData.artist}'s song video/audio locally and uploading it here, you get lag-free exact seek accuracy. Your browser handles this completely locally; nothing uploaded leaves your machine.
+                    {t('how_offline_desc_prefix')} {songData.artist}{t('how_offline_desc_suffix')}
                   </p>
                 </div>
 
@@ -4182,7 +4541,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
 
             {/* SECTIONS / TIMESTAMPS JUMP CONTROLS */}
             <div className="space-y-2 pt-2 border-t border-slate-800">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">Quick Jump Sections:</span>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">{t('quick_jump')}</span>
               <div className="grid grid-cols-2 gap-1.5">
                 {quickJumpSections.map((sec, i) => (
                   <button
@@ -4204,20 +4563,20 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
             <div className={`glass-card active-phrase ${isPlayingAudio ? 'is-playing' : ''} p-6 rounded-3xl space-y-3 shadow-xl transition-all duration-300`}>
               <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-400">
                 <Info className="w-4 h-4" />
-                <span>ACTIVE LYRIC STUDY TIP:</span>
+                <span>{t('study_tip_title')}</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed font-medium">
-                Observe how the singer states <strong className="text-teal-300">"{activePhrase.spanish}"</strong> (Phrase #{activePhrase.id}). 
-                This translates to <strong className="text-indigo-300">"{activePhrase.english}"</strong>.
+                {t('study_tip_observe')} <strong className="text-teal-300">"{activePhrase.spanish}"</strong> ({t('phrase')} #{activePhrase.id}). 
+                {t('study_tip_translates')} <strong className="text-indigo-300">"{activePhrase.english}"</strong>.
                 {activePhrase.breakdown && activePhrase.breakdown.length > 0 && (
                   <span className="block mt-1">
-                    Key word breakdown: {activePhrase.breakdown.slice(0, 3).map((b, i) => (
+                    {t('study_tip_breakdown')} {activePhrase.breakdown.slice(0, 3).map((b, i) => (
                       <span key={i}>
                         <strong className="text-pink-400">"{studyRole === 'spanish-learner' ? b.word : b.meaning}"</strong> ({studyRole === 'spanish-learner' ? b.meaning : b.word}){i < Math.min(2, activePhrase.breakdown.length - 1) ? ', ' : ''}
                       </span>
                     ))}.
                   </span>
-                )} Practice vocalizing this in sync with the song rhythm!
+                )} {t('study_tip_practice')}
               </p>
             </div>
           )}
@@ -4225,6 +4584,103 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
         </section>
 
       </main>
+
+      {/* SECONDARY VERIFICATION MODAL FOR LESSON DELETION */}
+      <AnimatePresence>
+        {songToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden text-left"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500" />
+              
+              <div className="flex items-center gap-3 text-rose-400 mb-4">
+                <div className="p-2 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-black tracking-tight text-slate-100">{t('delete_lesson_title')}</h3>
+              </div>
+
+              <div className="space-y-3.5 text-xs text-slate-300 leading-relaxed mb-6">
+                <p>
+                  {t('delete_lesson_desc')} <strong className="text-slate-100 font-extrabold">"{songToDelete.title}"</strong> from your library.
+                </p>
+                <p className="bg-rose-950/20 border border-rose-500/10 p-3 rounded-xl text-rose-300">
+                  {t('delete_lesson_warning')}
+                </p>
+                <div className="space-y-1.5 pt-2">
+                  <label htmlFor="confirm-delete-input" className="block text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                    {t('delete_lesson_confirm_prompt')} <span className="text-rose-400 font-mono font-black">{t('delete_word_target')}</span>
+                  </label>
+                  <input
+                    id="confirm-delete-input"
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder={t('delete_word_placeholder')}
+                    className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none font-mono"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => {
+                    setSongToDelete(null);
+                    setDeleteConfirmText('');
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-slate-150 font-bold rounded-xl text-xs transition cursor-pointer"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (deleteConfirmText.toUpperCase() === t('delete_word_target').toUpperCase() || deleteConfirmText.toUpperCase() === 'DELETE') {
+                      const target = songToDelete;
+                      setSongToDelete(null);
+                      setDeleteConfirmText('');
+                      
+                      await deleteSongFromCloud(target);
+                      
+                      setSavedSongs((prev) => {
+                        const updated = prev.filter(
+                          (s) => !(s.title === target.title && s.artist === target.artist)
+                        );
+                        localStorage.setItem('confieso_song_library', JSON.stringify(updated));
+                        
+                        const isActive = target.title.toLowerCase().trim() === songData.title.toLowerCase().trim() &&
+                                         target.artist.toLowerCase().trim() === songData.artist.toLowerCase().trim();
+                        if (isActive) {
+                          setSongData(SONG_DATA);
+                          localStorage.setItem('confieso_custom_song', JSON.stringify(SONG_DATA));
+                        }
+                        return updated;
+                      });
+                    }
+                  }}
+                  disabled={deleteConfirmText.toUpperCase() !== t('delete_word_target').toUpperCase() && deleteConfirmText.toUpperCase() !== 'DELETE'}
+                  className={`px-4 py-2 font-bold rounded-xl text-xs transition flex items-center gap-1.5 ${
+                    (deleteConfirmText.toUpperCase() === t('delete_word_target').toUpperCase() || deleteConfirmText.toUpperCase() === 'DELETE')
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer'
+                      : 'bg-slate-800/40 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> {t('delete_action')}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* FOOTER */}
       <footer className="border-t border-slate-900 py-4 text-center text-xs text-slate-500 bg-slate-950">
