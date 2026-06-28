@@ -604,7 +604,7 @@ export default function App() {
         phrases: sanitizedPhrases,
         vocab: sanitizedVocab,
         updatedAt: new Date().toISOString(),
-        createdBy: studyRole === 'spanish-learner' ? 'Andrew' : 'Friend'
+        createdBy: 'Andrew'
       };
 
       await setDoc(songDocRef, payload);
@@ -2191,7 +2191,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
             </div>
           </div>
 
-          {/* BOTTOM ROW: Cooperative Language Swap Hub (Collapsible on scroll) */}
+          {/* BOTTOM ROW: Active Recall Testing Mode Selector */}
           <AnimatePresence initial={false}>
             {showHeaderDetails && (
               <motion.div
@@ -2201,15 +2201,15 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 transition={{ duration: 0.25, ease: 'easeInOut' }}
                 className="overflow-hidden w-full border-t border-slate-900 pt-3"
               >
-                <div className="bg-gradient-to-r from-slate-900 via-indigo-950/10 to-slate-900 border border-slate-800/60 p-3 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="bg-gradient-to-r from-slate-900 via-teal-950/10 to-slate-900 border border-slate-800/60 p-3 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-teal-500/10 text-teal-400 rounded-lg border border-teal-500/20">
-                      <Users className="w-4.5 h-4.5" />
+                      <Languages className="w-4.5 h-4.5" />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-slate-100 flex flex-wrap items-center gap-2">
-                        <span>Cooperative Language Swap Hub</span>
-                        <span className="text-[9px] text-teal-300 font-mono bg-teal-500/10 px-1 py-0.5 rounded border border-teal-500/20">2-PLAYER</span>
+                        <span>Active Recall Testing Mode</span>
+                        <span className="text-[9px] text-teal-300 font-mono bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20">SOLO</span>
                         {cloudSyncStatus === 'synced' && (
                           <span className="text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
                             <Cloud className="w-2.5 h-2.5 text-emerald-400" />
@@ -2229,7 +2229,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                           </span>
                         )}
                       </h4>
-                      <p className="text-[11px] text-slate-400">Andrew is learning Spanish 🇪🇸 & Friend is learning English 🇺🇸. Tap roles to toggle active interfaces!</p>
+                      <p className="text-[11px] text-slate-400">Test your recall! Select whether the card front shows the target phrase or its English translation.</p>
                     </div>
                   </div>
                   
@@ -2246,8 +2246,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
                       }`}
                     >
-                      <span className="text-xs">🇺🇸</span>
-                      <span>Andrew (Spanish Learner)</span>
+                      <span>Spanish 🇪🇸 → English 🇺🇸</span>
                     </button>
                     
                     <button
@@ -2258,12 +2257,11 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       }}
                       className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer ${
                         studyRole === 'english-learner'
-                          ? 'bg-indigo-600 text-white font-black shadow-md shadow-indigo-600/20'
+                          ? 'bg-teal-500 text-slate-950 font-black shadow-md shadow-teal-500/10'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
                       }`}
                     >
-                      <span className="text-xs">🇪🇸</span>
-                      <span>Friend (English Learner)</span>
+                      <span>English 🇺🇸 → Spanish 🇪🇸</span>
                     </button>
                   </div>
                 </div>
@@ -2565,13 +2563,13 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       </div>
 
                       {/* Learner Languages selection row */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-800/50">
-                        {/* Default Learner (Andrew) Languages */}
+                      <div className="pt-2 border-t border-slate-800/50">
+                        {/* Study Languages */}
                         <div className="bg-slate-950/40 p-2.5 rounded-xl border border-slate-900 space-y-2">
-                          <span className="text-[10px] font-bold text-teal-400 block uppercase tracking-wider">Default Learner (Andrew)</span>
+                          <span className="text-[10px] font-bold text-teal-400 block uppercase tracking-wider">Study Languages Configuration</span>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="text-[9px] text-slate-500 block mb-0.5">Target (Learning):</label>
+                              <label className="text-[9px] text-slate-500 block mb-0.5">Target Language (e.g. Spanish):</label>
                               <input
                                 type="text"
                                 value={promptTargetLangA}
@@ -2580,37 +2578,12 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                               />
                             </div>
                             <div>
-                              <label className="text-[9px] text-slate-500 block mb-0.5">Native (Translation):</label>
+                              <label className="text-[9px] text-slate-500 block mb-0.5">Translation Language (e.g. English):</label>
                               <input
                                 type="text"
                                 value={promptNativeLangA}
                                 onChange={(e) => setPromptNativeLangA(e.target.value)}
                                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-200 focus:border-teal-500 outline-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Cooperative Learner (Friend) Languages */}
-                        <div className="bg-slate-950/40 p-2.5 rounded-xl border border-slate-900 space-y-2">
-                          <span className="text-[10px] font-bold text-indigo-400 block uppercase tracking-wider">Cooperative Learner (Friend)</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[9px] text-slate-500 block mb-0.5">Target (Learning):</label>
-                              <input
-                                type="text"
-                                value={promptTargetLangB}
-                                onChange={(e) => setPromptTargetLangB(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-200 focus:border-indigo-500 outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[9px] text-slate-500 block mb-0.5">Native (Translation):</label>
-                              <input
-                                type="text"
-                                value={promptNativeLangB}
-                                onChange={(e) => setPromptNativeLangB(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-200 focus:border-indigo-500 outline-none"
                               />
                             </div>
                           </div>
@@ -3105,7 +3078,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                         <div className="flex justify-between items-start">
                           <span className="text-[10px] uppercase tracking-widest font-black text-teal-400 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/30 flex items-center gap-1">
                             <Sparkle className="w-3 h-3 text-teal-300" /> 
-                            {studyRole === 'spanish-learner' ? 'Spanish Phrase' : 'English Prompt (For Friend)'}
+                            {studyRole === 'spanish-learner' ? 'Spanish Phrase' : 'English Prompt'}
                           </span>
                           <div className="flex items-center gap-1.5">
                             <button
@@ -3206,7 +3179,7 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                       >
                         <div className="flex justify-between items-start">
                           <span className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/30">
-                            {studyRole === 'spanish-learner' ? 'English Equivalent' : 'Spanish Original (For Andrew)'}
+                            {studyRole === 'spanish-learner' ? 'English Equivalent' : 'Spanish Original'}
                           </span>
                           <div className="flex items-center gap-1.5">
                             <button
@@ -3260,6 +3233,12 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                               activePhrase.literal.length > 80 ? 'text-[11px]' : 'text-xs'
                             }`}>"{activePhrase.literal}"</span>
                           </div>
+                          {buddyNotes[activePhrase.id]?.partnerA && (
+                            <div className="bg-slate-950/50 px-4 py-2 rounded-xl text-slate-300 max-w-md w-full mx-auto border border-teal-500/10 text-left">
+                              <span className="block text-[9px] uppercase font-bold text-teal-400 tracking-widest mb-0.5">My Study Notes</span>
+                              <span className="text-slate-200 block text-xs leading-relaxed font-sans">{buddyNotes[activePhrase.id].partnerA}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex justify-between items-center border-t border-slate-800/60 pt-4 text-xs text-slate-500">
@@ -4014,45 +3993,25 @@ Make sure to continue the sequential phrase IDs starting from ${startPhraseNum}.
                 </AnimatePresence>
               </div>
 
-              {/* COOPERATIVE BUDDY STUDY NOTES */}
+              {/* PERSONAL STUDY & RECALL NOTES */}
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-300 border-b border-slate-800 pb-2">
-                  <Users className="w-4 h-4 text-teal-400" />
-                  <span>Cooperative Buddy Study Notes</span>
+                  <BookOpen className="w-4 h-4 text-teal-400" />
+                  <span>Card Study Notes</span>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {/* Andrew's Notes Area */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-extrabold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
-                      <span>🇺🇸 Andrew's Notes</span>
-                      {studyRole === 'spanish-learner' && <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-ping" />}
-                    </label>
-                    <textarea
-                      id="partner-a-notes"
-                      rows={3}
-                      value={buddyNotes[activePhrase.id]?.partnerA || ''}
-                      onChange={(e) => saveBuddyNote(activePhrase.id, 'partnerA', e.target.value)}
-                      placeholder="Andrew's notes on pronunciation, vocal inflections, or slang translation..."
-                      className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none leading-relaxed resize-none"
-                    />
-                  </div>
-
-                  {/* Friend's Notes Area */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                      <span>🇪🇸 Friend's Notes</span>
-                      {studyRole === 'english-learner' && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />}
-                    </label>
-                    <textarea
-                      id="partner-b-notes"
-                      rows={3}
-                      value={buddyNotes[activePhrase.id]?.partnerB || ''}
-                      onChange={(e) => saveBuddyNote(activePhrase.id, 'partnerB', e.target.value)}
-                      placeholder="Friend's notes on English spelling, syntax, or vocabulary comparisons..."
-                      className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none leading-relaxed resize-none"
-                    />
-                  </div>
+                <div className="space-y-1.5 text-left">
+                  <label className="text-[10px] font-extrabold uppercase tracking-wider text-teal-400">
+                    My Study Notes (Appears on Back of Card)
+                  </label>
+                  <textarea
+                    id="phrase-study-notes"
+                    rows={3}
+                    value={buddyNotes[activePhrase.id]?.partnerA || ''}
+                    onChange={(e) => saveBuddyNote(activePhrase.id, 'partnerA', e.target.value)}
+                    placeholder="Add your notes on pronunciation, inflections, slang, grammar explanations, or reminders here..."
+                    className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none leading-relaxed resize-none"
+                  />
                 </div>
               </div>
             </div>
